@@ -1,0 +1,25 @@
+cd "E:\Documentos\App paroquia Nossa Senhora das Graças\client"
+dir package.json   # deve listar o arquivo
+
+npm install
+npm run dev
+
+https://github.com/ministrosnsdg-sketch/escala-ministros.git
+
+git remote add origin https://github.com/ministrosnsdg-sketch/escala-ministros.git
+git push -u origin main
+
+git config --global user.name  "Paroquia NSDG"
+git config --global user.email "ministrosnsdg@gmail.com"
+
+git config --global user.email "SEU_EMAIL_DO_GITHUB@exemplo.com"
+git config --global user.name "Seu Nome"
+
+
+git add -A
+git commit -m "fix(db): alinhar colunas min/max/time_hhmm/title + RLS profiles + fn_month_grid"
+git push origin main
+
+
+git clone https://github.com/ministrosnsdg-sketch/escala-ministros.git
+cd E:\Documentos\App paroquia Nossa Senhora das Graças
