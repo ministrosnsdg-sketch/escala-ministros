@@ -1,11 +1,22 @@
-<!doctype html>
-<html lang="pt-br">
+<!DOCTYPE html>
+<html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- PWA -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#4A6FA5" />
+
+    <!-- iOS -->
+    <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+
     <title>Escala de Ministros</title>
   </head>
-  <body class="bg-appBg">
+
+  <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
