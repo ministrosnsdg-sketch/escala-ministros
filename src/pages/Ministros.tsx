@@ -287,7 +287,8 @@ function MinistrosAdmin() {
       </div>
 
       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-        <table className="min-w-full text-[11px]">
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-[11px]">
           <thead className="bg-[#D6E6F7] text-[#3F5F8F]">
             <tr>
               <th className="px-2 py-2 text-left">Nome</th>
@@ -333,6 +334,8 @@ function MinistrosAdmin() {
           </tbody>
         </table>
       </div>
+    </div>
+
 
       {/* Modal: Novo Ministro */}
       {showNewModal && (
