@@ -3,7 +3,7 @@ import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabaseClient";
 
-type Mode = "login" | "changePassword" | "register";
+type Mode = "login" | "changePassword" | "register" | "forgotPassword";
 
 export default function Login() {
   const { signIn } = useAuth();
@@ -20,10 +20,10 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // 🔵 Estado para reset de senha
+  // 🔵 RESET DE SENHA (TELA ESPECÍFICA)
   const [resetEmail, setResetEmail] = useState("");
 
-  // troca de senha
+  // troca de senha obrigatória
   const [newPassword, setNewPassword] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
   const [pendingUserId, setPendingUserId] = useState<string | null>(null);
@@ -38,6 +38,7 @@ export default function Login() {
 
   const isChangeMode = mode === "changePassword";
   const isRegisterMode = mode === "register";
+  const isForgot = mode === "forgotPassword";
 
   useEffect(() => {
     return () => {
@@ -56,6 +57,11 @@ export default function Login() {
 
     if (isRegisterMode) {
       await handleRegister();
+      return;
+    }
+
+    if (isForgot) {
+      await handleResetPassword();
       return;
     }
 
@@ -119,9 +125,7 @@ export default function Login() {
       }
 
       if (!rememberMe) {
-        window.onbeforeunload = () => {
-          supabase.auth.signOut();
-        };
+        window.onbeforeunload = () => supabase.auth.signOut();
       } else {
         window.onbeforeunload = null;
       }
@@ -135,11 +139,11 @@ export default function Login() {
     }
   };
 
-  // ---------------- RESET DE SENHA (NOVO) ----------------
+  // ---------------- RESET DE SENHA (TELA SEPARADA) ----------------
 
   const handleResetPassword = async () => {
     if (!resetEmail.trim()) {
-      setError("Informe o e-mail para resetar a senha.");
+      setError("Informe o e-mail para redefinir a senha.");
       return;
     }
 
@@ -161,30 +165,27 @@ export default function Login() {
         return;
       }
 
-      setError(
-        "Senha redefinida com sucesso! Use a senha: 123456 para entrar."
-      );
+      setError("Senha redefinida com sucesso! Use a senha: 123456 para entrar.");
       setResetEmail("");
       setLoading(false);
+      setMode("login");
     } catch (err) {
       console.error(err);
-      setError("Erro inesperado ao tentar redefinir a senha.");
+      setError("Erro inesperado ao redefinir a senha.");
       setLoading(false);
     }
   };
 
-  // ---------------- TROCA DE SENHA PRIMEIRO ACESSO ----------------
+  // ---------------- TROCA DE SENHA OBRIGATÓRIA ----------------
 
   const handleChangePassword = async () => {
     if (!pendingUserId) {
-      setError(
-        "Não foi possível identificar o usuário para troca de senha. Faça login novamente."
-      );
+      setError("Não foi possível identificar o usuário. Faça login novamente.");
       return;
     }
 
     if (!newPassword || newPassword.length < 6) {
-      setError("A nova senha deve ser maior que 6 caracteres.");
+      setError("A nova senha deve ter pelo menos 6 caracteres.");
       return;
     }
 
@@ -203,7 +204,7 @@ export default function Login() {
 
       if (updErr) {
         console.error(updErr);
-        setError("Erro ao trocar a senha.");
+        setError("Erro ao atualizar a senha.");
         setLoading(false);
         return;
       }
@@ -232,7 +233,7 @@ export default function Login() {
     }
 
     if (!regPassword || regPassword.length < 6) {
-      setError("A senha deve ter no mínimo 6 caracteres.");
+      setError("A senha deve ter pelo menos 6 caracteres.");
       return;
     }
 
@@ -261,8 +262,7 @@ export default function Login() {
       if (error || (data as any)?.error) {
         console.error(error || (data as any)?.error);
         setError(
-          (data as any)?.error ||
-            "Não foi possível concluir o cadastro. Verifique o código."
+          (data as any)?.error || "Não foi possível concluir o cadastro."
         );
         setLoading(false);
         return;
@@ -279,7 +279,7 @@ export default function Login() {
       setRegPassword("");
       setRegPassword2("");
 
-      setError("Cadastro realizado! Agora faça login.");
+      setError("Cadastro realizado com sucesso!");
       setLoading(false);
     } catch (err) {
       console.error(err);
@@ -288,22 +288,29 @@ export default function Login() {
     }
   };
 
+  // ---------------- UI HELPERS ----------------
+
   const renderTitle = () => {
-    if (isChangeMode)
-      return "Defina sua nova senha para continuar";
-    if (isRegisterMode)
-      return "Cadastro restrito com código";
-    return "Acesso restrito à coordenação e ministros autorizados";
+    if (isChangeMode) return "Defina sua nova senha";
+    if (isRegisterMode) return "Cadastro com código";
+    if (isForgot) return "Redefinir senha";
+    return "Acesso restrito";
   };
 
   const submitLabel = () => {
-    if (loading && isChangeMode) return "Salvando...";
-    if (loading && isRegisterMode) return "Cadastrando...";
-    if (loading) return "Entrando...";
+    if (loading) {
+      if (isChangeMode) return "Salvando...";
+      if (isRegisterMode) return "Cadastrando...";
+      if (isForgot) return "Enviando...";
+      return "Entrando...";
+    }
     if (isChangeMode) return "Salvar nova senha";
     if (isRegisterMode) return "Cadastrar";
+    if (isForgot) return "Enviar redefinição";
     return "Entrar";
   };
+
+  const isSuccess = error?.toLowerCase().includes("sucesso");
 
   // ---------------- RENDER ----------------
 
@@ -312,7 +319,7 @@ export default function Login() {
       <div className="bg-white rounded-xl shadow-md p-6 w-full max-w-sm border border-[#D6E6F7]">
         <img
           src="/brasao.png"
-          alt="Brasão da Paróquia"
+          alt="Brasão"
           className="mx-auto mb-3 h-[4cm] w-auto"
         />
 
@@ -324,7 +331,7 @@ export default function Login() {
           {renderTitle()}
         </h2>
 
-        {!isChangeMode && (
+        {!isChangeMode && !isForgot && (
           <div className="flex mb-3 text-[10px] border-b border-gray-200">
             <button
               type="button"
@@ -359,13 +366,20 @@ export default function Login() {
         )}
 
         {error && (
-          <div className="mb-3 text-[10px] text-red-600 bg-red-50 border border-red-200 px-2 py-1.5 rounded">
+          <div
+            className={`mb-3 text-[10px] px-2 py-1.5 rounded border ${
+              isSuccess
+                ? "text-green-700 bg-green-50 border-green-200"
+                : "text-red-600 bg-red-50 border-red-200"
+            }`}
+          >
             {error}
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-3">
-          {mode === "login" && !isChangeMode && (
+          {/* LOGIN */}
+          {mode === "login" && !isChangeMode && !isRegisterMode && (
             <>
               <div>
                 <label className="block text-[10px] text-gray-600 mb-1">
@@ -391,25 +405,23 @@ export default function Login() {
                 />
               </div>
 
-              <div className="flex items-center justify-between mt-1">
-                <label className="flex items-center gap-1 text-[9px] text-gray-600">
+              <div className="flex justify-between items-center">
+                <label className="text-[9px] text-gray-600 flex items-center gap-1">
                   <input
                     type="checkbox"
                     checked={rememberMe}
                     onChange={(e) => setRememberMe(e.target.checked)}
                   />
-                  Permanecer conectado neste dispositivo
+                  Permanecer conectado
                 </label>
-              </div>
 
-              {/* 🔵 NOVO: "Esqueci minha senha" */}
-              <div className="mt-2">
                 <button
                   type="button"
                   className="text-[10px] text-blue-600 underline"
                   onClick={() => {
+                    setMode("forgotPassword");
+                    setError(null);
                     setResetEmail(email);
-                    handleResetPassword();
                   }}
                 >
                   Esqueci minha senha
@@ -418,12 +430,11 @@ export default function Login() {
             </>
           )}
 
+          {/* TROCA DE SENHA */}
           {isChangeMode && (
             <>
               <div>
-                <label className="block text-[10px] text-gray-600 mb-1">
-                  Nova senha
-                </label>
+                <label className="block text-[10px]">Nova senha</label>
                 <input
                   type="password"
                   className="w-full border rounded px-2 py-1 text-sm"
@@ -433,9 +444,7 @@ export default function Login() {
               </div>
 
               <div>
-                <label className="block text-[10px] text-gray-600 mb-1">
-                  Repita a nova senha
-                </label>
+                <label className="block text-[10px]">Repita a nova senha</label>
                 <input
                   type="password"
                   className="w-full border rounded px-2 py-1 text-sm"
@@ -446,9 +455,91 @@ export default function Login() {
             </>
           )}
 
-          {isRegisterMode && !isChangeMode && (
+          {/* ESQUECI MINHA SENHA */}
+          {isForgot && (
             <>
-              {/* ... mantém todo o cadastro exatamente como estava ... */}
+              <div>
+                <label className="block text-[10px]">E-mail cadastrado</label>
+                <input
+                  type="email"
+                  className="w-full border rounded px-2 py-1 text-sm"
+                  value={resetEmail}
+                  onChange={(e) => setResetEmail(e.target.value)}
+                />
+              </div>
+
+              <button
+                type="button"
+                className="text-[10px] text-blue-600 underline"
+                onClick={() => {
+                  setMode("login");
+                  setError(null);
+                }}
+              >
+                Voltar ao login
+              </button>
+            </>
+          )}
+
+          {/* CADASTRO COM CÓDIGO */}
+          {isRegisterMode && !isChangeMode && !isForgot && (
+            <>
+              <div>
+                <label className="block text-[10px]">Código *</label>
+                <input
+                  className="w-full border rounded px-2 py-1 text-sm"
+                  value={regCode}
+                  onChange={(e) => setRegCode(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px]">Nome completo *</label>
+                <input
+                  className="w-full border rounded px-2 py-1 text-sm"
+                  value={regName}
+                  onChange={(e) => setRegName(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px]">E-mail *</label>
+                <input
+                  type="email"
+                  className="w-full border rounded px-2 py-1 text-sm"
+                  value={regEmail}
+                  onChange={(e) => setRegEmail(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px]">Telefone (opcional)</label>
+                <input
+                  className="w-full border rounded px-2 py-1 text-sm"
+                  value={regPhone}
+                  onChange={(e) => setRegPhone(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px]">Senha *</label>
+                <input
+                  type="password"
+                  className="w-full border rounded px-2 py-1 text-sm"
+                  value={regPassword}
+                  onChange={(e) => setRegPassword(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px]">Repita a senha *</label>
+                <input
+                  type="password"
+                  className="w-full border rounded px-2 py-1 text-sm"
+                  value={regPassword2}
+                  onChange={(e) => setRegPassword2(e.target.value)}
+                />
+              </div>
             </>
           )}
 
