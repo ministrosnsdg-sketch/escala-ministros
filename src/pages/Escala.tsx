@@ -499,15 +499,18 @@ function EscalaInner() {
             const isToday = c.date === todayIso;
 
             const base =
-              "h-10 rounded border bg-white hover:bg-gray-50 transition relative cursor-pointer";
-            const todayClass = isToday ? " border-[#4A6FA5] border-2" : "";
+  "h-10 rounded border transition relative cursor-pointer";
+
+const todayClass = isToday
+  ? "border-green-600 border-2 bg-green-100"
+  : "bg-white hover:bg-gray-50";
 
             return (
               <div
-                key={idx}
-                className={base + todayClass}
-                onClick={() => handleDayClick(c.date)}
-              >
+  key={idx}
+  className={`${base} ${todayClass}`}
+  onClick={() => handleDayClick(c.date)}
+>
                 <div className="absolute top-1 left-1 text-[11px] font-semibold text-gray-700">
                   {c.day}
                 </div>
