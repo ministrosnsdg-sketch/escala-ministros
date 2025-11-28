@@ -86,6 +86,8 @@ function EscalaInner() {
   const [err, setErr] = useState<string | null>(null);
   const [useAvailabilityFallback, setUseAvailabilityFallback] = useState(false);
 
+  const [showMyAssignments, setShowMyAssignments] = useState(true);
+
   // Buscar ministro do usuário logado
   useEffect(() => {
     async function fetchMinister() {
@@ -112,7 +114,6 @@ function EscalaInner() {
       return;
     }
     loadMonth();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ministerId, month, year]);
 
   async function loadMonth() {
@@ -167,7 +168,7 @@ function EscalaInner() {
       setExtraInfoById(extraMap);
       setExtrasDates(extraDateSet);
 
-      // ESCALA FINAL
+      // MISSAS FINAIS (regular + extras)
       let regRows: any[] = [];
       let exAssRows: any[] = [];
       try {
@@ -177,18 +178,14 @@ function EscalaInner() {
           .gte("date", start)
           .lte("date", end);
         if (!error && data) regRows = data as any[];
-      } catch {
-        // se não existir, ignoramos
-      }
+      } catch {}
 
       try {
         const { data, error } = await supabase
           .from("escala_extras")
           .select("extra_id, minister_id");
         if (!error && data) exAssRows = data as any[];
-      } catch {
-        // idem
-      }
+      } catch {}
 
       const hasFinalSchedule = regRows.length > 0 || exAssRows.length > 0;
 
@@ -226,32 +223,21 @@ function EscalaInner() {
       } else {
         // FALLBACK: disponibilidades
         try {
-          const { data: avData, error: avErr } = await supabase
+          const { data: avData } = await supabase
             .from("monthly_availability_regular")
             .select("minister_id, date, horario_id")
             .gte("date", start)
             .lte("date", end);
 
-          if (avErr) {
-            console.error("Erro monthly_availability_regular:", avErr);
-          }
-
           let avExtras: { minister_id: string; extra_id: number }[] = [];
+
           if (exData && (exData as any[]).length > 0) {
             const extraIds = (exData as any[]).map((e: any) => e.id);
-            const { data: avExData, error: avExErr } = await supabase
+            const { data: avExData } = await supabase
               .from("availability_extras")
               .select("minister_id, extra_id")
               .in("extra_id", extraIds);
-
-            if (!avExErr && avExData) {
-              avExtras = avExData as any[];
-            } else if (avExErr) {
-              console.error(
-                "Erro availability_extras (fallback):",
-                avExErr
-              );
-            }
+            if (avExData) avExtras = avExData as any[];
           }
 
           const hasAny =
@@ -263,15 +249,14 @@ function EscalaInner() {
 
             (avData || []).forEach((r: any) => {
               if (r.minister_id !== ministerId) return;
-              const date = r.date as string;
               const time =
                 horarioMap.get(r.horario_id as number) || "";
               myAss.push({
-                date,
+                date: r.date as string,
                 kind: "Disponibilidade",
                 time,
               });
-              assignedSet.add(date);
+              assignedSet.add(r.date as string);
             });
 
             avExtras.forEach((r) => {
@@ -286,19 +271,19 @@ function EscalaInner() {
               });
               assignedSet.add(info.date);
             });
-          } else {
-            setUseAvailabilityFallback(false);
           }
-        } catch (e) {
-          console.error("Fallback disponibilidade falhou:", e);
-          setUseAvailabilityFallback(false);
-        }
+        } catch {}
       }
 
-      const inMonth = myAssignmentsFilterInMonth(myAss, start, end);
+      const inMonth = myAss.filter((a) => a.date >= start && a.date <= end);
+      inMonth.sort((a, b) => {
+        if (a.date !== b.date) return a.date < b.date ? -1 : 1;
+        return (a.time || "").localeCompare(b.time || "");
+      });
+
       setMyAssignments(inMonth);
       setAssignedDates(assignedSet);
-    } catch (e: any) {
+    } catch (e) {
       console.error(e);
       setErr("Não foi possível carregar a escala deste mês.");
       setMyAssignments([]);
@@ -310,22 +295,7 @@ function EscalaInner() {
     }
   }
 
-  function myAssignmentsFilterInMonth(
-    myAss: MyAssignment[],
-    start: string,
-    end: string
-  ) {
-    const inMonth = myAss.filter(
-      (a) => a.date >= start && a.date <= end
-    );
-    inMonth.sort((a, b) => {
-      if (a.date !== b.date) return a.date < b.date ? -1 : 1;
-      return (a.time || "").localeCompare(b.time || "");
-    });
-    return inMonth;
-  }
-
-  // Células do calendário
+  // Células do calendário (menor altura h-10)
   const days = lastDay.getDate();
   const firstWeekday = firstDay.getDay();
   const cells: { day?: number; date?: string }[] = [];
@@ -335,7 +305,6 @@ function EscalaInner() {
     cells.push({ day: d, date: dt });
   }
 
-  // Clique no dia => detalhes
   async function handleDayClick(date?: string) {
     if (!date) return;
     setSelectedDate(date);
@@ -346,133 +315,108 @@ function EscalaInner() {
       const list: DayAssignment[] = [];
 
       if (!useAvailabilityFallback) {
-        // Escala final
+        // ESCALA FINAL
         try {
-          const { data, error } = await supabase
+          const { data } = await supabase
             .from("escala_regular")
             .select("date, horario_id, minister_id")
             .eq("date", date);
 
-          if (!error && data) {
-            (data as any[]).forEach((r) => {
-              const time =
-                horarioMap.get(r.horario_id as number) || "";
-              const ministerName =
-                ministerMap.get(r.minister_id as string) || "—";
-              list.push({
-                date,
-                time,
-                type: "Fixa",
-                ministerName,
-              });
+          (data || []).forEach((r: any) => {
+            const time = horarioMap.get(r.horario_id as number) || "";
+            const ministerName =
+              ministerMap.get(r.minister_id as string) || "—";
+            list.push({
+              date,
+              time,
+              type: "Fixa",
+              ministerName,
             });
-          }
-        } catch {
-          // ok se não existir
-        }
+          });
+        } catch {}
 
         try {
-          const { data: dayExtras, error: exErrDay } = await supabase
+          const { data: dayExtras } = await supabase
             .from("extras")
             .select("id, time, title")
             .eq("event_date", date)
             .eq("active", true);
 
-          if (!exErrDay && dayExtras && dayExtras.length > 0) {
+          if (dayExtras && dayExtras.length > 0) {
             const ids = dayExtras.map((e: any) => e.id);
-            const { data: exScale, error: exScaleErr } = await supabase
+            const { data: exScale } = await supabase
               .from("escala_extras")
               .select("extra_id, minister_id")
               .in("extra_id", ids);
 
-            if (!exScaleErr && exScale) {
-              (exScale as any[]).forEach((r) => {
-                const info = dayExtras.find(
-                  (e: any) => e.id === r.extra_id
-                );
-                if (!info) return;
-                const ministerName =
-                  ministerMap.get(r.minister_id as string) || "—";
-                list.push({
-                  date,
-                  time: info.time,
-                  type: "Extra",
-                  title: info.title,
-                  ministerName,
-                });
-              });
-            }
-          }
-        } catch {
-          // ok
-        }
-      } else {
-        // Fallback: disponibilidades
-        try {
-          const { data: avData, error: avErr } = await supabase
-            .from("monthly_availability_regular")
-            .select("minister_id, date, horario_id")
-            .eq("date", date);
-
-          if (!avErr && avData) {
-            (avData as any[]).forEach((r) => {
-              const time =
-                horarioMap.get(r.horario_id as number) || "";
+            (exScale || []).forEach((r: any) => {
+              const info = dayExtras.find((e: any) => e.id === r.extra_id);
+              if (!info) return;
               const ministerName =
                 ministerMap.get(r.minister_id as string) || "—";
+
               list.push({
                 date,
-                time,
-                type: "Disponibilidade",
+                time: info.time,
+                type: "Extra",
+                title: info.title,
                 ministerName,
               });
             });
           }
-        } catch (e) {
-          console.warn(
-            "Erro ao carregar monthly_availability_regular do dia",
-            e
-          );
-        }
+        } catch {}
+      } else {
+        // FALLBACK
+        try {
+          const { data: avData } = await supabase
+            .from("monthly_availability_regular")
+            .select("minister_id, date, horario_id")
+            .eq("date", date);
+
+          (avData || []).forEach((r: any) => {
+            const time =
+              horarioMap.get(r.horario_id as number) || "";
+            const ministerName =
+              ministerMap.get(r.minister_id as string) || "—";
+            list.push({
+              date,
+              time,
+              type: "Disponibilidade",
+              ministerName,
+            });
+          });
+        } catch {}
 
         try {
-          const { data: dayExtras, error: exErrDay } = await supabase
+          const { data: extrasDay } = await supabase
             .from("extras")
             .select("id, time, title")
             .eq("event_date", date)
             .eq("active", true);
 
-          if (!exErrDay && dayExtras && dayExtras.length > 0) {
-            const ids = dayExtras.map((e: any) => e.id);
-            const { data: avExData, error: avExErr } = await supabase
+          if (extrasDay && extrasDay.length > 0) {
+            const ids = extrasDay.map((e: any) => e.id);
+            const { data: avExData } = await supabase
               .from("availability_extras")
               .select("minister_id, extra_id")
               .in("extra_id", ids);
 
-            if (!avExErr && avExData) {
-              (avExData as any[]).forEach((r) => {
-                const info = dayExtras.find(
-                  (e: any) => e.id === r.extra_id
-                );
-                if (!info) return;
-                const ministerName =
-                  ministerMap.get(r.minister_id as string) || "—";
-                list.push({
-                  date,
-                  time: info.time,
-                  type: "Disponibilidade",
-                  title: info.title,
-                  ministerName,
-                });
+            (avExData || []).forEach((r: any) => {
+              const info = extrasDay.find((e: any) => e.id === r.extra_id);
+              if (!info) return;
+              const ministerName =
+                ministerMap.get(r.minister_id as string) || "—";
+
+              list.push({
+                date,
+                time: info.time,
+                type: "Disponibilidade",
+                title: info.title,
+                ministerName,
               });
-            }
+            });
           }
-        } catch (e) {
-          console.warn(
-            "Erro ao carregar availability_extras do dia",
-            e
-          );
-        }
+        } catch {}
       }
 
       list.sort((a, b) => (a.time || "").localeCompare(b.time || ""));
@@ -545,7 +489,7 @@ function EscalaInner() {
               return (
                 <div
                   key={idx}
-                  className="h-16 rounded bg-gray-50 border border-dashed border-gray-200"
+                  className="h-10 rounded bg-gray-50 border border-dashed border-gray-200"
                 />
               );
             }
@@ -555,7 +499,7 @@ function EscalaInner() {
             const isToday = c.date === todayIso;
 
             const base =
-              "h-16 rounded border bg-white hover:bg-gray-50 transition relative cursor-pointer";
+              "h-10 rounded border bg-white hover:bg-gray-50 transition relative cursor-pointer";
             const todayClass = isToday ? " border-[#4A6FA5] border-2" : "";
 
             return (
@@ -583,67 +527,82 @@ function EscalaInner() {
 
       {/* Lista: minhas marcações */}
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-        <div className="px-3 py-2 bg-[#D6E6F7] text-[10px] text-[#3F5F8F] font-semibold">
+        <div
+          className="px-3 py-2 bg-[#D6E6F7] text-[10px] text-[#3F5F8F] font-semibold flex justify-between items-center cursor-pointer"
+          onClick={() => setShowMyAssignments(!showMyAssignments)}
+        >
           {useAvailabilityFallback
             ? "Suas disponibilidades deste mês"
             : "Suas celebrações deste mês"}
+
+          <span className="text-[9px] text-[#4A6FA5] underline">
+            {showMyAssignments ? "Ocultar" : "Mostrar"}
+          </span>
         </div>
 
-        {loading ? (
-          <div className="p-3 text-[10px] text-gray-600">Carregando...</div>
-        ) : err ? (
-          <div className="p-3 text-[10px] text-red-600">{err}</div>
-        ) : myAssignments.length === 0 ? (
-          <div className="p-3 text-[10px] text-gray-600">
-            {useAvailabilityFallback
-              ? "Nenhuma disponibilidade registrada para este mês."
-              : "Nenhuma escala registrada para este mês."}
-          </div>
-        ) : (
-          <table className="min-w-full text-[10px]">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-2 py-1 text-left">Data</th>
-                <th className="px-2 py-1 text-center">Hora</th>
-                <th className="px-2 py-1 text-left">Título</th>
-              </tr>
-            </thead>
-            <tbody>
-              {myAssignments.map((a, i) => {
-                const isTodayRow = a.date === todayIso;
-                const rowClass =
-                  "border-t border-gray-100" +
-                  (isTodayRow ? " bg-green-50" : "");
-
-                const strongCell =
-                  "px-2 py-1" +
-                  (isTodayRow ? " text-green-700 font-semibold" : "");
-                const normalCell = "px-2 py-1";
-
-                return (
-                  <tr
-                    key={`${a.date}-${a.time}-${i}`}
-                    className={rowClass}
-                  >
-                    <td className={strongCell}>
-                      {a.date.split("-").reverse().join("/")}
-                    </td>
-                    <td className={strongCell + " text-center"}>
-                      {(a.time || "").slice(0, 5)}h
-                    </td>
-                    <td className={normalCell}>
-                      {a.title ||
-                        (a.kind === "Fixa"
-                          ? "Missa"
-                          : a.kind === "Extra"
-                          ? "Missa Extra"
-                          : "")}
-                    </td>
+        {showMyAssignments && (
+          <>
+            {loading ? (
+              <div className="p-3 text-[10px] text-gray-600">
+                Carregando...
+              </div>
+            ) : err ? (
+              <div className="p-3 text-[10px] text-red-600">{err}</div>
+            ) : myAssignments.length === 0 ? (
+              <div className="p-3 text-[10px] text-gray-600">
+                {useAvailabilityFallback
+                  ? "Nenhuma disponibilidade registrada para este mês."
+                  : "Nenhuma escala registrada para este mês."}
+              </div>
+            ) : (
+              <table className="min-w-full text-[10px]">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-2 py-1 text-left">Data</th>
+                    <th className="px-2 py-1 text-center">Hora</th>
+                    <th className="px-2 py-1 text-left">Título</th>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                </thead>
+                <tbody>
+                  {myAssignments.map((a, i) => {
+                    const isTodayRow = a.date === todayIso;
+                    const rowClass =
+                      "border-t border-gray-100" +
+                      (isTodayRow ? " bg-green-50" : "");
+
+                    const strongCell =
+                      "px-2 py-1" +
+                      (isTodayRow
+                        ? " text-green-700 font-semibold"
+                        : "");
+                    const normalCell = "px-2 py-1";
+
+                    return (
+                      <tr
+                        key={`${a.date}-${a.time}-${i}`}
+                        className={rowClass}
+                      >
+                        <td className={strongCell}>
+                          {a.date.split("-").reverse().join("/")}
+                        </td>
+                        <td className={strongCell + " text-center"}>
+                          {(a.time || "").slice(0, 5)}h
+                        </td>
+                        <td className={normalCell}>
+                          {a.title ||
+                            (a.kind === "Fixa"
+                              ? "Missa"
+                              : a.kind === "Extra"
+                              ? "Missa Extra"
+                              : "")}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </>
         )}
       </div>
 
@@ -681,7 +640,10 @@ function EscalaInner() {
               (() => {
                 const grouped: Record<string, DayAssignment[]> =
                   dayAssignments.reduce(
-                    (acc: Record<string, DayAssignment[]>, a) => {
+                    (acc: Record<
+                      string,
+                      DayAssignment[]
+                    >, a) => {
                       const key = a.time || "";
                       if (!acc[key]) acc[key] = [];
                       acc[key].push(a);
@@ -702,14 +664,23 @@ function EscalaInner() {
                           className="border-b last:border-b-0 pb-2"
                         >
                           <div className="text-xs font-semibold text-gray-800">
-                            {time.slice(0, 5)}h
+                            {entries[0].title ? (
+                              <>
+                                {time.slice(0, 5)}h –{" "}
+                                <span className="text-purple-600 font-semibold">
+                                  {entries[0].title}
+                                </span>
+                              </>
+                            ) : (
+                              `${time.slice(0, 5)}h`
+                            )}
                           </div>
+
                           <div className="mt-1 text-[11px] text-[#4A6FA5] leading-snug">
                             {entries.map((entry, idx) => (
                               <span key={idx}>
                                 {idx > 0 && " - "}
                                 {entry.ministerName}
-                                {entry.title ? ` - ${entry.title}` : ""}
                               </span>
                             ))}
                           </div>
