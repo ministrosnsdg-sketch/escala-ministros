@@ -1,3 +1,4 @@
+// PARTE 1 — topo do arquivo
 import {
   useContext,
   useEffect,
@@ -22,7 +23,7 @@ type Minister = {
 type AvailabilityOverride = {
   id: number;
   year: number;
-  month: number; // 1..12
+  month: number;
   open_from: string;
   open_until: string;
   created_at?: string;
@@ -31,7 +32,7 @@ type AvailabilityOverride = {
 type Horario = {
   id: number;
   weekday: number;
-  time: string; // HH:MM:SS
+  time: string;
   min_required: number;
   max_allowed: number;
   active: boolean;
@@ -39,7 +40,7 @@ type Horario = {
 
 type Extra = {
   id: number;
-  event_date: string; // YYYY-MM-DD
+  event_date: string;
   time: string;
   title: string;
   min_required: number;
@@ -125,27 +126,7 @@ function DisponibilidadeInner() {
 
   const [settingsDaysBefore, setSettingsDaysBefore] = useState<number>(10);
   const [overrides, setOverrides] = useState<AvailabilityOverride[]>([]);
-
-  // Carregar overrides (liberações manuais) em efeito dedicado
-  useEffect(() => {
-    if (!user) return;
-    let mounted = true;
-    (async () => {
-      const { data: ovData, error: ovErr } = await supabase
-        .from("availability_overrides")
-        .select("*")
-        .gte("open_until", new Date().toISOString())
-        .order("open_from", { ascending: true });
-
-      if (!ovErr && mounted)
-        setOverrides((ovData || []) as AvailabilityOverride[]);
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, [user]);
   const [settingsHardClose, setSettingsHardClose] = useState<boolean>(false);
-  // (fetch de overrides movido para useEffect dedicado)
 
   const [loadingBase, setLoadingBase] = useState(true);
   const [loadingMonth, setLoadingMonth] = useState(false);
@@ -156,22 +137,19 @@ function DisponibilidadeInner() {
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   const [showConfirm, setShowConfirm] = useState(false);
-  const [pendingNav, setPendingNav] = useState<{ to: any; replace?: boolean } | null>(
-    null
-  );
+  const [pendingNav, setPendingNav] = useState<{ to: any; replace?: boolean } | null>(null);
   const [showNavConfirm, setShowNavConfirm] = useState(false);
 
-  // Recorrência
   const [recWeekday, setRecWeekday] = useState<number | "">("");
   const [recHorarioId, setRecHorarioId] = useState<number | "">("");
 
-  // Mês padrão: próximo mês real
   const now = new Date();
   const defaultMonth = now.getMonth() === 11 ? 0 : now.getMonth() + 1;
   const defaultYear =
     now.getMonth() === 11 ? now.getFullYear() + 1 : now.getFullYear();
+
   const [year, setYear] = useState(defaultYear);
-  const [month, setMonth] = useState(defaultMonth); // 0-11
+  const [month, setMonth] = useState(defaultMonth);
 
   const firstDayOfMonth = useMemo(
     () => new Date(year, month, 1),
@@ -181,6 +159,7 @@ function DisponibilidadeInner() {
     () => new Date(year, month + 1, 0),
     [year, month]
   );
+
   const monthLabel = useMemo(
     () => `${MONTH_NAMES[month]} / ${year}`,
     [month, year]
@@ -190,9 +169,8 @@ function DisponibilidadeInner() {
   const realNextYear =
     now.getMonth() === 11 ? now.getFullYear() + 1 : now.getFullYear();
 
-  // Regra da janela de edição
+  // Regra janela
   const { canEditSelectedMonth, windowMessage } = useMemo(() => {
-    // Se existir liberação manual para o mês/ano selecionado, ela tem precedência
     const manual = overrides.find(
       (ov) =>
         ov.year === year &&
@@ -260,7 +238,7 @@ function DisponibilidadeInner() {
     overrides,
   ]);
 
-  // Matriz do calendário
+  // MATRIZ MENSAL
   const daysMatrix = useMemo(() => {
     const matrix: { day: number | null; date: string | null }[][] = [];
     const firstWeekday = firstDayOfMonth.getDay();
@@ -291,13 +269,7 @@ function DisponibilidadeInner() {
 
   const horariosPorWeekday = useMemo(() => {
     const map: Record<number, Horario[]> = {
-      0: [],
-      1: [],
-      2: [],
-      3: [],
-      4: [],
-      5: [],
-      6: [],
+      0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: [],
     };
     horarios.forEach((h) => {
       if (h.active) map[h.weekday].push(h);
@@ -313,7 +285,6 @@ function DisponibilidadeInner() {
     });
     return map;
   }, [extras]);
-
   const hasPendingChanges =
     JSON.stringify(Array.from(monthlyDraft).sort()) !==
       JSON.stringify(Array.from(originalMonthly).sort()) ||
@@ -335,7 +306,7 @@ function DisponibilidadeInner() {
     };
   }, [hasPendingChanges]);
 
-  // Bloquear navegação interna com alterações
+  // BLOQUEAR NAVEGAÇÃO INTERNA
   useEffect(() => {
     if (!navigation || !navigation.navigator) return;
     const nav = navigation.navigator;
@@ -389,7 +360,7 @@ function DisponibilidadeInner() {
       if (meErr || !meData) {
         console.error(meErr);
         setError(
-          "Seu usuário não está vinculado a um ministro. Procure a coordenação para ajustar o cadastro."
+          "Seu usuário não está vinculado a um ministro. Procure a coordenação."
         );
         setLoadingBase(false);
         return;
@@ -512,7 +483,6 @@ function DisponibilidadeInner() {
       const extrasList = (exData || []) as Extra[];
       setExtras(extrasList);
 
-      // disponibilidade extras
       const extraIds = extrasList.map((e) => e.id);
       let origExtras = new Set<number>();
       if (extraIds.length > 0) {
@@ -524,7 +494,7 @@ function DisponibilidadeInner() {
 
         if (aexErr) {
           console.error(aexErr);
-          setError("Não foi possível carregar disponibilidade nas missas extras.");
+          setError("Não foi possível carregar disponibilidade extras.");
           setLoadingMonth(false);
           return;
         }
@@ -537,7 +507,7 @@ function DisponibilidadeInner() {
       setOriginalExtras(origExtras);
       setExtrasDraft(new Set(origExtras));
 
-      // contagens mensais
+      // contagens fixas
       const { data: countData } = await supabase.rpc(
         "get_slot_availability_counts",
         { start_date: start, end_date: end }
@@ -566,15 +536,16 @@ function DisponibilidadeInner() {
       for (let d = 1; d <= daysInMonth; d++) {
         const dt = new Date(year, month, d);
         const wd = dt.getDay();
+        const dtStr = formatDate(dt);
         if (
           (horariosPorWeekday[wd] && horariosPorWeekday[wd].length > 0) ||
-          extrasByDate[formatDate(dt)]
+          extrasByDate[dtStr]
         ) {
-          initial = formatDate(dt);
+          initial = dtStr;
           break;
         }
       }
-      setSelectedDate(initial);
+      setSelectedDate(null);
 
       setLoadingMonth(false);
     };
@@ -609,7 +580,7 @@ function DisponibilidadeInner() {
     setExtrasDraft(next);
   };
 
-  // ========= BUSCA DE MINISTRO (ADMIN) =========
+  // ========= BUSCA DE MINISTRO =========
 
   const handleMinisterSearchChange = (value: string) => {
     setMinisterSearch(value);
@@ -652,11 +623,10 @@ function DisponibilidadeInner() {
     setInfo(
       mode === "set"
         ? "Recorrência aplicada para o mês."
-        : "Recorrência removida para o mês."
+        : "Recorrência removida."
     );
     setError(null);
   };
-
   // ========= DIFERENÇAS =========
 
   const buildChanges = () => {
@@ -774,7 +744,7 @@ function DisponibilidadeInner() {
     }
 
     try {
-      // deleta normais
+      // deletar fixos
       for (const { date, horario_id } of toDeleteMonthly) {
         await supabase
           .from("monthly_availability_regular")
@@ -784,7 +754,7 @@ function DisponibilidadeInner() {
           .eq("horario_id", horario_id);
       }
 
-      // insere normais
+      // inserir fixos
       if (toInsertMonthly.length > 0) {
         const rows = toInsertMonthly.map(({ date, horario_id }) => ({
           minister_id: selectedMinisterId,
@@ -794,7 +764,7 @@ function DisponibilidadeInner() {
         await supabase.from("monthly_availability_regular").insert(rows);
       }
 
-      // deleta extras
+      // deletar extras
       for (const extra_id of toDeleteExtras) {
         await supabase
           .from("availability_extras")
@@ -803,7 +773,7 @@ function DisponibilidadeInner() {
           .eq("extra_id", extra_id);
       }
 
-      // insere extras
+      // inserir extras
       if (toInsertExtras.length > 0) {
         const rows = toInsertExtras.map((extra_id) => ({
           minister_id: selectedMinisterId,
@@ -821,13 +791,13 @@ function DisponibilidadeInner() {
       return true;
     } catch (e: any) {
       console.error(e);
-      setError("Erro ao salvar disponibilidade. Tente novamente.");
+      setError("Erro ao salvar. Tente novamente.");
       setSavingAll(false);
       return false;
     }
   };
 
-  // ========= MODAIS & NAV =========
+  // ========= MODAIS & NAVEGAÇÃO =========
 
   const openConfirm = () => {
     if (!hasPendingChanges) {
@@ -886,7 +856,91 @@ function DisponibilidadeInner() {
       </div>
     );
   }
+{/* ================= RECORRÊNCIA ================= */}
+{canEditSelectedMonth && (
+  <div className="bg-white border border-gray-200 rounded-2xl p-3 text-[9px] space-y-2">
 
+    <div className="flex flex-col sm:flex-row sm:items-end gap-2">
+
+      {/* Dia da semana */}
+      <div className="flex-1">
+        <label className="block text-[9px] text-gray-600 mb-1">
+          Recorrência - Dia da semana
+        </label>
+        <select
+          className="w-full border rounded px-2 py-1"
+          value={recWeekday === "" ? "" : recWeekday}
+          onChange={(e) =>
+            setRecWeekday(
+              e.target.value === "" ? "" : Number(e.target.value)
+            )
+          }
+        >
+          <option value="">Selecione</option>
+          {WEEKDAYS_FULL.map((w, idx) => (
+            <option key={idx} value={idx}>
+              {w}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Horário */}
+      <div className="flex-1">
+        <label className="block text-[9px] text-gray-600 mb-1">
+          Horário fixo
+        </label>
+        <select
+          className="w-full border rounded px-2 py-1"
+          value={recHorarioId === "" ? "" : recHorarioId}
+          onChange={(e) =>
+            setRecHorarioId(
+              e.target.value === "" ? "" : Number(e.target.value)
+            )
+          }
+          disabled={
+            recWeekday === "" || horariosForRecWeekday.length === 0
+          }
+        >
+          <option value="">Selecione</option>
+          {horariosForRecWeekday.map((h) => (
+            <option key={h.id} value={h.id}>
+              {WEEKDAYS_FULL[h.weekday]} — {h.time.slice(0, 5)}h
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Botões */}
+      <div className="flex flex-col sm:flex-row gap-1 sm:ml-2">
+        <button
+          onClick={() => applyRecurrence("set")}
+          disabled={
+            recWeekday === "" || recHorarioId === "" || savingAll
+          }
+          className="px-3 py-1.5 rounded-full bg-[#7C3AED] text-white text-[9px] hover:bg-[#6D28D9] disabled:opacity-50"
+        >
+          Aplicar no mês
+        </button>
+
+        <button
+          onClick={() => applyRecurrence("clear")}
+          disabled={
+            recWeekday === "" || recHorarioId === "" || savingAll
+          }
+          className="px-3 py-1.5 rounded-full border border-gray-300 text-[9px] text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+        >
+          Limpar recorrência
+        </button>
+      </div>
+    </div>
+
+    <p className="text-[8px] text-gray-500">
+      Exemplo: "Todas as segundas às 11h30" — escolha o dia,
+      selecione o horário e clique em "Aplicar no mês".
+    </p>
+  </div>
+)}
   const currentMinister =
     ministers.find((m) => m.id === selectedMinisterId) || me;
 
@@ -905,6 +959,7 @@ function DisponibilidadeInner() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-3">
+
       {/* Cabeçalho */}
       <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2">
         <div>
@@ -912,8 +967,7 @@ function DisponibilidadeInner() {
             Disponibilidade Mensal
           </h2>
           <p className="text-[10px] text-gray-700">
-            Selecione os dias e horários em que você (ou o ministro selecionado)
-            pode servir. As escolhas só valem após confirmação.
+            Selecione os dias e horários. Suas escolhas só valem após confirmação.
           </p>
         </div>
         <div className="flex gap-2 items-center">
@@ -940,17 +994,17 @@ function DisponibilidadeInner() {
         </div>
       </div>
 
-      {/* Info janela */}
+      {/* Info da janela */}
       <div className="bg-[#F7FAFF] border border-[#D6E6F7] rounded-xl px-3 py-2 text-[9px] text-[#3F5F8F] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
         <div>{windowMessage}</div>
         {isAdmin && (
           <div className="text-[8px] text-gray-500">
-            (Configuração em Relatórios &gt; Janela de disponibilidade)
+            (Config. em Relatórios &gt; Janela de disponibilidade)
           </div>
         )}
       </div>
 
-      {/* Seleção de ministro (admin) */}
+      {/* Seleção ministro */}
       {isAdmin && (
         <div className="mb-1">
           <label className="block text-[9px] text-gray-600 mb-1">
@@ -959,7 +1013,7 @@ function DisponibilidadeInner() {
           <input
             type="text"
             className="border rounded px-2 py-1 text-[10px] w-full mb-1"
-            placeholder="Buscar ministro pelo nome..."
+            placeholder="Buscar ministro..."
             value={ministerSearch}
             onChange={(e) => handleMinisterSearchChange(e.target.value)}
           />
@@ -977,6 +1031,7 @@ function DisponibilidadeInner() {
         </div>
       )}
 
+      {/* ERROS / INFOS */}
       {error && (
         <div className="text-[10px] text-red-600 bg-red-50 border border-red-200 px-3 py-2 rounded">
           {error}
@@ -987,515 +1042,403 @@ function DisponibilidadeInner() {
           {info}
         </div>
       )}
+{/* ================= RECORRÊNCIA ================= */}
+{canEditSelectedMonth && (
+  <div className="bg-[#F7FAFF] border border-[#D6E6F7] rounded-2xl p-3 text-[9px] space-y-2">
 
-      {loadingMonth ? (
-        <p className="text-[10px] text-gray-600">
-          Carregando disponibilidade...
-        </p>
-      ) : (
-        <>
-          {/* Calendário */}
-          <div className="bg-white border border-gray-200 rounded-2xl p-3">
-            <div className="text-center mb-2">
-              <div className="inline-block px-6 py-1.5 rounded-full bg-[#2756A3] text-white text-[11px] font-semibold">
-                {monthLabel.toUpperCase()}
+    <div className="flex flex-col sm:flex-row sm:items-end gap-2">
+
+      {/* Dia da semana */}
+      <div className="flex-1">
+        <label className="block text-[9px] text-[#4A6FA5] mb-1">
+          Recorrência — Dia da semana
+        </label>
+        <select
+          className="w-full border border-[#D6E6F7] rounded px-2 py-1 text-[10px]"
+          value={recWeekday === "" ? "" : recWeekday}
+          onChange={(e) =>
+            setRecWeekday(
+              e.target.value === "" ? "" : Number(e.target.value)
+            )
+          }
+        >
+          <option value="">Selecione</option>
+          {WEEKDAYS_FULL.map((w, idx) => (
+            <option key={idx} value={idx}>
+              {w}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Horário */}
+      <div className="flex-1">
+        <label className="block text-[9px] text-[#4A6FA5] mb-1">
+          Horário fixo
+        </label>
+        <select
+          className="w-full border border-[#D6E6F7] rounded px-2 py-1 text-[10px]"
+          value={recHorarioId === "" ? "" : recHorarioId}
+          onChange={(e) =>
+            setRecHorarioId(
+              e.target.value === "" ? "" : Number(e.target.value)
+            )
+          }
+          disabled={
+            recWeekday === "" || horariosForRecWeekday.length === 0
+          }
+        >
+          <option value="">Selecione</option>
+          {horariosForRecWeekday.map((h) => (
+            <option key={h.id} value={h.id}>
+              {WEEKDAYS_FULL[h.weekday]} — {h.time.slice(0, 5)}h
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* Botões */}
+      <div className="flex flex-col sm:flex-row gap-1 sm:ml-2">
+        <button
+          onClick={() => applyRecurrence("set")}
+          disabled={
+            recWeekday === "" || recHorarioId === "" || savingAll
+          }
+          className="px-3 py-1.5 rounded-full bg-[#4A6FA5] text-white text-[9px] hover:bg-[#3F5F8F] disabled:opacity-50"
+        >
+          Aplicar no mês
+        </button>
+
+        <button
+          onClick={() => applyRecurrence("clear")}
+          disabled={
+            recWeekday === "" || recHorarioId === "" || savingAll
+          }
+          className="px-3 py-1.5 rounded-full border border-gray-300 text-[9px] text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+        >
+          Limpar recorrência
+        </button>
+      </div>
+    </div>
+
+    <p className="text-[8px] text-gray-500">
+      Exemplo: “Todas as segundas às 11h30” — selecione dia e hora e clique.
+    </p>
+  </div>
+)}
+
+      {/* CALENDÁRIO */}
+      <div className="bg-white border border-gray-200 rounded-2xl p-3">
+        <div className="text-center mb-2">
+          <div className="inline-block px-6 py-1.5 rounded-full bg-[#2756A3] text-white text-[11px] font-semibold">
+            {monthLabel.toUpperCase()}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-7 gap-1 text-center mb-1 text-[9px] font-semibold text-[#2756A3]">
+          {WEEKDAYS_SHORT.map((w, i) => (
+            <div key={i}>{w}</div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-7 gap-1 text-center text-[10px]">
+          {daysMatrix.map((week, wi) =>
+            week.map((cell, ci) => {
+              if (!cell.date || cell.day === null) {
+                return (
+                  <div key={`${wi}-${ci}`} className="h-8 rounded-lg" />
+                );
+              }
+
+              const date = cell.date;
+              const d = new Date(date + "T00:00:00");
+              const wd = d.getDay();
+
+              const hs = horariosPorWeekday[wd] || [];
+              const hasHorario = hs.length > 0;
+              const hasExtras = !!extrasByDate[date];
+
+              const hasFixedSelection =
+                hasHorario &&
+                hs.some((h) => monthlyDraft.has(`${date}|${h.id}`));
+
+              const hasExtraSelection =
+                hasExtras &&
+                (extrasByDate[date] || []).some((e) =>
+                  extrasDraft.has(e.id)
+                );
+
+              const hasSelection = hasFixedSelection || hasExtraSelection;
+
+              const isDisabled = !hasHorario && !hasExtras;
+              const isSelected = selectedDate === date;
+
+              const base =
+                "h-8 flex flex-col items-center justify-center rounded-lg border text-[10px] transition-colors";
+              let cls =
+                "border-gray-200 bg-white text-gray-800 cursor-pointer hover:bg-[#EEF4FF]";
+
+              if (isDisabled) {
+                cls =
+                  "border-transparent bg-gray-50 text-gray-300 cursor-default";
+              }
+
+              if (isSelected && !isDisabled) {
+                cls =
+                  "border-[#2756A3] bg-white text-[#2756A3] font-semibold shadow-sm";
+              }
+
+              return (
+                <button
+                  key={date}
+                  onClick={() => {
+                    setSelectedDate(date);
+                  }}
+                  className={`${base} ${cls}`}
+                >
+                  <span>{cell.day}</span>
+                  <div className="mt-[1px] flex gap-[2px]">
+                    {hasSelection && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#16A34A]" />
+                    )}
+                    {hasExtras && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-purple-600" />
+                    )}
+                  </div>
+                </button>
+              );
+            })
+          )}
+        </div>
+
+        {/* LEGENDA */}
+        <div className="mt-3 flex flex-wrap gap-3 text-[8px] text-gray-600">
+          <div className="flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-[#16A34A]" />
+            <span>Dia com horários marcados</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full bg-purple-600" />
+            <span>Dia com missa extra</span>
+          </div>
+        </div>
+      </div>
+
+      {/* ========= MODAL CENTRAL ========= */}
+      {selectedDate && (
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-3">
+          <div className="bg-white w-full max-w-md rounded-xl shadow-2xl border border-gray-200 p-4">
+
+            {/* Cabeçalho modal */}
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h3 className="text-sm font-semibold text-[#4A6FA5]">
+                  {weekdayLabel} — {selectedDate.split("-").reverse().join("/")}
+                </h3>
+                <p className="text-[10px] text-gray-600">
+                  Marque os horários desejados.
+                </p>
               </div>
+
+              <button
+                onClick={() => setSelectedDate(null)}
+                className="text-[10px] px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded"
+              >
+                Fechar
+              </button>
             </div>
 
-            <div className="grid grid-cols-7 gap-1 text-center mb-1 text-[9px] font-semibold text-[#2756A3]">
-              {WEEKDAYS_SHORT.map((w, i) => (
-                <div key={i}>{w}</div>
-              ))}
-            </div>
+            {/* Conteúdo modal */}
+            <div className="space-y-4 max-h-[70vh] overflow-y-auto px-1">
 
-            <div className="grid grid-cols-7 gap-1 text-center text-[10px]">
-              {daysMatrix.map((week, wi) =>
-                week.map((cell, ci) => {
-                  if (!cell.date || cell.day === null) {
-                    return (
-                      <div key={`${wi}-${ci}`} className="h-8 rounded-lg" />
-                    );
-                  }
+              {/* Horários Fixos */}
+              {dayHorarios.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-semibold text-gray-700 mb-1">
+                    Missas Fixas
+                  </h4>
 
-                  const date = cell.date;
-                  const d = new Date(date + "T00:00:00");
-                  const wd = d.getDay();
+                  <div className="space-y-2">
+                    {dayHorarios.map((h) => {
+                      const key = `${selectedDate}|${h.id}`;
+                      const checked = monthlyDraft.has(key);
+                      const count = slotCounts[key] || 0;
 
-                  const hs = horariosPorWeekday[wd] || [];
-                  const hasHorario = hs.length > 0;
-                  const hasExtras = !!extrasByDate[date];
+                      return (
+                        <div
+                          key={h.id}
+                          className="flex items-center justify-between border rounded-lg px-3 py-2 bg-gray-50"
+                        >
+                          <div>
+                            <div className="text-[11px] font-semibold">
+                              {h.time.slice(0, 5)}h
+                            </div>
+                            <div className="text-[9px] text-gray-600">
+                              Min {h.min_required} • Máx {h.max_allowed} • Atual {count}
+                            </div>
+                          </div>
 
-                  // Seleções fixas
-                  const hasFixedSelection =
-                    hasHorario &&
-                    hs.some((h) => monthlyDraft.has(`${date}|${h.id}`));
+                          <input
+                            type="checkbox"
+                            className="w-4 h-4"
+                            checked={checked}
+                            onChange={() => toggleDraftMonthly(selectedDate, h.id)}
+                            disabled={!canEditSelectedMonth}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
-                  // Seleções em missas extras
-                  const hasExtraSelection =
-                    hasExtras &&
-                    (extrasByDate[date] || []).some((e) =>
-                      extrasDraft.has(e.id)
-                    );
+              {/* Missas Extras */}
+              {dayExtras.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-semibold text-purple-700 mb-1">
+                    Missas Extras
+                  </h4>
 
-                  // Qualquer seleção (fixo ou extra)
-                  const hasSelection =
-                    hasFixedSelection || hasExtraSelection;
+                  <div className="space-y-2">
+                    {dayExtras.map((e) => {
+                      const checked = extrasDraft.has(e.id);
+                      const count = extraCounts[e.id] || 0;
 
-                  const isDisabled = !hasHorario && !hasExtras;
-                  const isSelected = selectedDate === date;
+                      return (
+                        <div
+                          key={e.id}
+                          className="flex items-center justify-between border rounded-lg px-3 py-2 bg-purple-50 border-purple-300"
+                        >
+                          <div>
+                            <div className="text-[11px] font-semibold text-purple-700">
+                              {e.time.slice(0, 5)}h — {e.title}
+                            </div>
+                            <div className="text-[9px] text-gray-600">
+                              Min {e.min_required} • Máx {e.max_allowed} • Atual {count}
+                            </div>
+                          </div>
 
-                  const base =
-                    "h-8 flex flex-col items-center justify-center rounded-lg border text-[10px] transition-colors";
-                  let cls =
-                    "border-gray-200 bg-white text-gray-800 cursor-pointer hover:bg-[#EEF4FF]";
+                          <input
+                            type="checkbox"
+                            className="w-4 h-4 text-purple-700"
+                            checked={checked}
+                            onChange={() => toggleDraftExtra(e.id)}
+                            disabled={!canEditSelectedMonth}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
-                  if (isDisabled) {
-                    cls =
-                      "border-transparent bg-gray-50 text-gray-300 cursor-default";
-                  }
-
-                  if (isSelected && !isDisabled) {
-                    cls =
-                      "border-[#2756A3] bg-white text-[#2756A3] font-semibold shadow-sm";
-                  }
-
-                  return (
-                    <button
-                      key={date}
-                      onClick={() => {
-                        if (!isDisabled) setSelectedDate(date);
-                      }}
-                      className={`${base} ${cls}`}
-                      disabled={isDisabled}
-                    >
-                      <span>{cell.day}</span>
-                      <div className="mt-[1px] flex gap-[2px]">
-                        {hasSelection && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#16A34A]" />
-                        )}
-                        {hasExtras && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#8B5CF6]" />
-                        )}
-                      </div>
-                    </button>
-                  );
-                })
+              {/* Sem horários */}
+              {dayHorarios.length === 0 && dayExtras.length === 0 && (
+                <div className="text-[10px] text-gray-600 text-center py-4">
+                  Não há horários cadastrados para este dia.
+                </div>
               )}
             </div>
 
-            {/* Legenda */}
-            <div className="mt-3 flex flex-wrap gap-3 text-[8px] text-gray-600">
-              <div className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-[#16A34A]" />
-                <span>Dia com horários marcados (fixos ou extras)</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-[#8B5CF6]" />
-                <span>Dia com missas extras cadastradas</span>
-              </div>
+            {/* Rodapé modal */}
+            <div className="mt-4 flex justify-end">
+              <button
+                onClick={() => setSelectedDate(null)}
+                className="text-[10px] px-4 py-2 bg-[#4A6FA5] text-white rounded hover:bg-[#3F5F8F] transition"
+              >
+                OK
+              </button>
             </div>
           </div>
-
-          {/* Recorrência */}
-          {canEditSelectedMonth && (
-            <div className="bg-white border border-gray-200 rounded-2xl p-3 text-[9px] space-y-2">
-              <div className="flex flex-col sm:flex-row sm:items-end gap-2">
-                <div className="flex-1">
-                  <label className="block text-[9px] text-gray-600 mb-1">
-                    Recorrência - Dia da semana
-                  </label>
-                  <select
-                    className="w-full border rounded px-2 py-1"
-                    value={recWeekday === "" ? "" : recWeekday}
-                    onChange={(e) =>
-                      setRecWeekday(
-                        e.target.value === "" ? "" : Number(e.target.value)
-                      )
-                    }
-                  >
-                    <option value="">Selecione</option>
-                    {WEEKDAYS_FULL.map((w, idx) => (
-                      <option key={idx} value={idx}>
-                        {w}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="flex-1">
-                  <label className="block text-[9px] text-gray-600 mb-1">
-                    Horário fixo
-                  </label>
-                  <select
-                    className="w-full border rounded px-2 py-1"
-                    value={recHorarioId === "" ? "" : recHorarioId}
-                    onChange={(e) =>
-                      setRecHorarioId(
-                        e.target.value === "" ? "" : Number(e.target.value)
-                      )
-                    }
-                    disabled={
-                      recWeekday === "" || horariosForRecWeekday.length === 0
-                    }
-                  >
-                    <option value="">Selecione</option>
-                    {horariosForRecWeekday.map((h) => (
-                      <option key={h.id} value={h.id}>
-                        {WEEKDAYS_FULL[h.weekday]} - {h.time.slice(0, 5)}h
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="flex flex-col sm:flex-row gap-1 sm:ml-2">
-                  <button
-                    onClick={() => applyRecurrence("set")}
-                    disabled={
-                      recWeekday === "" || recHorarioId === "" || savingAll
-                    }
-                    className="px-3 py-1.5 rounded-full bg-[#4A6FA5] text-white text-[9px] hover:bg-[#3F5F8F] disabled:opacity-50"
-                  >
-                    Aplicar no mês
-                  </button>
-                  <button
-                    onClick={() => applyRecurrence("clear")}
-                    disabled={
-                      recWeekday === "" || recHorarioId === "" || savingAll
-                    }
-                    className="px-3 py-1.5 rounded-full border border-gray-300 text-[9px] text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-                  >
-                    Limpar recorrência
-                  </button>
-                </div>
-              </div>
-              <p className="text-[8px] text-gray-500">
-                Exemplo: "Todas as segundas às 11h30" — escolha o dia,
-                selecione o horário e clique em "Aplicar no mês".
-              </p>
-            </div>
-          )}
-
-          {/* Painel do dia selecionado */}
-          {selectedDate && selectedDateObj && (
-            <div className="bg-white border border-gray-200 rounded-2xl p-3 space-y-2">
-              <div className="flex justify-between items-baseline">
-                <div>
-                  <div className="text-[11px] font-semibold text-[#2756A3]">
-                    {weekdayLabel.toUpperCase()} —{" "}
-                    {selectedDateObj.toLocaleDateString("pt-BR")}
-                  </div>
-                  <div className="text-[9px] text-gray-600">
-                    Selecione os horários em que{" "}
-                    {isAdmin ? currentMinister.name : "você"} poderá servir.
-                  </div>
-                </div>
-              </div>
-
-              {/* Horários fixos */}
-              {dayHorarios.length === 0 ? (
-                <div className="text-[10px] text-gray-500">
-                  Nenhum horário fixo para este dia.
-                </div>
-              ) : (
-                <div className="space-y-1.5">
-                  {dayHorarios.map((h) => {
-                    const key = `${selectedDate}|${h.id}`;
-                    const checked = monthlyDraft.has(key);
-                    const currentCount = slotCounts[key] || 0;
-                    const willAdd =
-                      !originalMonthly.has(key) && monthlyDraft.has(key);
-                    const willRemove =
-                      originalMonthly.has(key) && !monthlyDraft.has(key);
-                    const projected =
-                      currentCount + (willAdd ? 1 : 0) - (willRemove ? 1 : 0);
-                    const full = projected >= h.max_allowed && !checked;
-
-                    return (
-                      <div
-                        key={key}
-                        className="flex items-center justify-between px-3 py-2 rounded-xl border border-gray-200 bg-gray-50"
-                      >
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            disabled={!canEditSelectedMonth || full || savingAll}
-                            onChange={() => toggleDraftMonthly(selectedDate, h.id)}
-                          />
-                          <div className="flex flex-col">
-                            <span className="text-[11px] font-semibold text-gray-800">
-                              {h.time.slice(0, 5)}h
-                            </span>
-                            <span className="text-[9px] text-gray-500">
-                              Min {h.min_required} • Max {h.max_allowed} • Atual:{" "}
-                              {currentCount}
-                            </span>
-                          </div>
-                        </div>
-                        {full && !checked && (
-                          <span className="text-[8px] text-red-500">
-                            Limite atingido
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* Missas extras */}
-              {dayExtras.length > 0 && (
-                <div className="pt-1 border-t border-gray-200 mt-2 space-y-1.5">
-                  <div className="text-[9px] font-semibold text-[#2756A3]">
-                    Missas extras neste dia
-                  </div>
-                  {dayExtras.map((e) => {
-                    const checked = extrasDraft.has(e.id);
-                    const currentCount = extraCounts[e.id] || 0;
-                    const willAdd =
-                      !originalExtras.has(e.id) && extrasDraft.has(e.id);
-                    const willRemove =
-                      originalExtras.has(e.id) && !extrasDraft.has(e.id);
-                    const projected =
-                      currentCount + (willAdd ? 1 : 0) - (willRemove ? 1 : 0);
-                    const full = projected >= e.max_allowed && !checked;
-
-                    return (
-                      <div
-                        key={e.id}
-                        className="flex items-center justify-between px-3 py-2 rounded-xl border border-[#F2E3C6] bg-[#FFF9EE]"
-                      >
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            disabled={!canEditSelectedMonth || full || savingAll}
-                            onChange={() => toggleDraftExtra(e.id)}
-                          />
-                          <div className="flex flex-col">
-                            <span className="text-[11px] font-semibold text-gray-800">
-                              {e.time.slice(0, 5)}h — {e.title}
-                            </span>
-                            <span className="text-[9px] text-gray-500">
-                              Min {e.min_required} • Max {e.max_allowed} • Atual:{" "}
-                              {currentCount}
-                            </span>
-                          </div>
-                        </div>
-                        {full && !checked && (
-                          <span className="text-[8px] text-red-500">
-                            Limite atingido
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Barra fixa de alterações pendentes */}
-          {hasPendingChanges && (
-            <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-30 bg-white border border-[#4A6FA5] rounded-2xl shadow-lg px-4 py-2 flex flex-col sm:flex-row items-center gap-2 text-[9px]">
-              <span className="text-[#2756A3] font-semibold">
-                Você tem alterações de disponibilidade não confirmadas.
-              </span>
-              <div className="flex gap-2">
-                <button
-                  onClick={openConfirm}
-                  disabled={savingAll}
-                  className="px-3 py-1 rounded-full bg-[#4A6FA5] text-white text-[9px] hover:bg-[#3F5F8F]"
-                >
-                  Revisar e confirmar
-                </button>
-                <button
-                  onClick={() => {
-                    setMonthlyDraft(new Set(originalMonthly));
-                    setExtrasDraft(new Set(originalExtras));
-                    setInfo("Alterações descartadas. Nada foi salvo.");
-                    setError(null);
-                  }}
-                  disabled={savingAll}
-                  className="px-3 py-1 rounded-full border border-gray-300 text-[9px] text-gray-600 hover:bg-gray-50"
-                >
-                  Cancelar alterações
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Modal confirmar alterações */}
-          {showConfirm && (
-            <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-40">
-              <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full p-4 space-y-2 text-[9px]">
-                <div className="flex justify-between items-center mb-1">
-                  <h3 className="text-[11px] font-semibold text-[#2756A3]">
-                    Confirmar disponibilidade
-                  </h3>
-                  <button
-                    onClick={() => !savingAll && setShowConfirm(false)}
-                    className="text-gray-400 hover:text-gray-700 text-[12px]"
-                  >
-                    ✕
-                  </button>
-                </div>
-                <p className="text-gray-700">
-                  Revise as alterações abaixo. Ao confirmar, suas escolhas serão
-                  salvas e usadas para montar a escala.
-                </p>
-
-                <div className="max-h-52 overflow-y-auto border border-gray-100 rounded-lg p-2 space-y-1">
-                  {(() => {
-                    const {
-                      toInsertMonthly,
-                      toDeleteMonthly,
-                      toInsertExtras,
-                      toDeleteExtras,
-                    } = buildChanges();
-
-                    if (
-                      toInsertMonthly.length === 0 &&
-                      toDeleteMonthly.length === 0 &&
-                      toInsertExtras.length === 0 &&
-                      toDeleteExtras.length === 0
-                    ) {
-                      return (
-                        <p className="text-gray-500">
-                          Nenhuma alteração detectada.
-                        </p>
-                      );
-                    }
-
-                    const horarioById = new Map(
-                      horarios.map((h) => [h.id, h])
-                    );
-                    const extrasById = new Map(extras.map((e) => [e.id, e]));
-
-                    return (
-                      <>
-                        {toInsertMonthly.map(({ date, horario_id }, i) => {
-                          const h = horarioById.get(horario_id);
-                          if (!h) return null;
-                          const d = new Date(date + "T00:00:00");
-                          return (
-                            <div
-                              key={"im" + i + date + horario_id}
-                              className="text-green-700"
-                            >
-                              + {d.toLocaleDateString("pt-BR")} —{" "}
-                              {WEEKDAYS_FULL[d.getDay()]} às{" "}
-                              {h.time.slice(0, 5)}h
-                            </div>
-                          );
-                        })}
-                        {toDeleteMonthly.map(({ date, horario_id }, i) => {
-                          const h = horarioById.get(horario_id);
-                          if (!h) return null;
-                          const d = new Date(date + "T00:00:00");
-                          return (
-                            <div
-                              key={"dm" + i + date + horario_id}
-                              className="text-red-600"
-                            >
-                              - {d.toLocaleDateString("pt-BR")} —{" "}
-                              {WEEKDAYS_FULL[d.getDay()]} às{" "}
-                              {h.time.slice(0, 5)}h
-                            </div>
-                          );
-                        })}
-                        {toInsertExtras.map((id, i) => {
-                          const ex = extrasById.get(id);
-                          if (!ex) return null;
-                          const d = new Date(ex.event_date + "T00:00:00");
-                          return (
-                            <div
-                              key={"ie" + i + id}
-                              className="text-green-700"
-                            >
-                              + Extra: {ex.title} —{" "}
-                              {d.toLocaleDateString("pt-BR")} às{" "}
-                              {ex.time.slice(0, 5)}h
-                            </div>
-                          );
-                        })}
-                        {toDeleteExtras.map((id, i) => {
-                          const ex = extrasById.get(id);
-                          if (!ex) return null;
-                          const d = new Date(ex.event_date + "T00:00:00");
-                          return (
-                            <div
-                              key={"de" + i + id}
-                              className="text-red-600"
-                            >
-                              - Extra: {ex.title} —{" "}
-                              {d.toLocaleDateString("pt-BR")} às{" "}
-                              {ex.time.slice(0, 5)}h
-                            </div>
-                          );
-                        })}
-                      </>
-                    );
-                  })()}
-                </div>
-
-                <div className="flex justify-end gap-2 pt-1">
-                  <button
-                    onClick={() => !savingAll && setShowConfirm(false)}
-                    className="px-3 py-1 rounded-full border border-gray-300 text-[9px] text-gray-600 hover:bg-gray-50"
-                    disabled={savingAll}
-                  >
-                    Voltar
-                  </button>
-                  <button
-                    onClick={handleConfirmOnly}
-                    className="px-3 py-1 rounded-full bg-[#4A6FA5] text-white text-[9px] hover:bg-[#3F5F8F] disabled:opacity-60"
-                    disabled={savingAll}
-                  >
-                    {savingAll ? "Salvando..." : "Confirmar e salvar"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Modal ao trocar de página com mudanças */}
-          {showNavConfirm && (
-            <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
-              <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-4 space-y-2 text-[9px]">
-                <h3 className="text-[11px] font-semibold text-[#2756A3] mb-1">
-                  Você tem alterações não confirmadas
-                </h3>
-                <p className="text-gray-700">
-                  Você selecionou horários, mas ainda não confirmou. O que deseja
-                  fazer antes de mudar de página?
-                </p>
-                <div className="flex flex-col gap-2 pt-1">
-                  <button
-                    onClick={handleConfirmAndNavigate}
-                    className="w-full px-3 py-1.5 rounded-full bg-[#4A6FA5] text-white text-[9px] hover:bg-[#3F5F8F] disabled:opacity-60"
-                    disabled={savingAll}
-                  >
-                    Confirmar, salvar e sair
-                  </button>
-                  <button
-                    onClick={handleDiscardAndNavigate}
-                    className="w-full px-3 py-1.5 rounded-full border border-gray-300 text-[9px] text-gray-700 hover:bg-gray-50 disabled:opacity-60"
-                    disabled={savingAll}
-                  >
-                    Descartar alterações e sair
-                  </button>
-                  <button
-                    onClick={handleStayOnPage}
-                    className="w-full px-3 py-1.5 rounded-full text-[9px] text-gray-600 hover:bg-gray-50"
-                    disabled={savingAll}
-                  >
-                    Voltar e continuar editando
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-        </>
+        </div>
       )}
+      {/* ========= MODAL DE CONFIRMAÇÃO (Salvar) ========= */}
+      {showConfirm && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-4 border border-gray-200">
+            <h3 className="text-sm font-semibold text-[#4A6FA5] mb-2">
+              Confirmar alterações?
+            </h3>
+            <p className="text-[10px] text-gray-700 mb-4">
+              Você possui alterações não salvas. Deseja confirmar agora?
+            </p>
+
+            <div className="flex justify-end gap-2 mt-2">
+              <button
+                onClick={() => setShowConfirm(false)}
+                className="text-[10px] px-3 py-1 rounded bg-gray-100 hover:bg-gray-200"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleConfirmOnly}
+                className="text-[10px] px-3 py-1 rounded bg-[#4A6FA5] text-white hover:bg-[#3F5F8F]"
+              >
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========= MODAL CONFIRMAR NAVEGAÇÃO ========= */}
+      {showNavConfirm && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-4 border border-gray-200">
+            <h3 className="text-sm font-semibold text-[#4A6FA5] mb-2">
+              Sair sem salvar?
+            </h3>
+            <p className="text-[10px] text-gray-700 mb-4">
+              Há alterações não salvas. Deseja realmente sair?
+            </p>
+
+            <div className="flex justify-end gap-2 mt-2">
+              <button
+                onClick={handleStayOnPage}
+                className="text-[10px] px-3 py-1 rounded bg-gray-100 hover:bg-gray-200"
+              >
+                Permanecer
+              </button>
+              <button
+                onClick={handleDiscardAndNavigate}
+                className="text-[10px] px-3 py-1 rounded bg-red-600 text-white hover:bg-red-700"
+              >
+                Descartar
+              </button>
+              <button
+                onClick={handleConfirmAndNavigate}
+                className="text-[10px] px-3 py-1 rounded bg-[#4A6FA5] text-white hover:bg-[#3F5F8F]"
+              >
+                Salvar e Sair
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========= RODAPÉ — CONFIRMAR ALTERAÇÕES ========= */}
+      <div className="sticky bottom-0 bg-white border-t border-gray-200 p-3 rounded-t-xl shadow-inner">
+        <div className="flex items-center justify-between">
+          <div className="text-[10px] text-gray-600">
+            {hasPendingChanges
+              ? "Alterações pendentes"
+              : "Nenhuma alteração pendente"}
+          </div>
+
+          <button
+            onClick={openConfirm}
+            disabled={!hasPendingChanges || savingAll}
+            className={`px-4 py-2 rounded text-[11px] text-white transition ${
+              hasPendingChanges
+                ? "bg-[#4A6FA5] hover:bg-[#3F5F8F]"
+                : "bg-gray-400 cursor-not-allowed"
+            }`}
+          >
+            {savingAll ? "Salvando..." : "Confirmar Alterações"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
+
