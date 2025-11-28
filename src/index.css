@@ -2,6 +2,11 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 🔵 AUMENTO GLOBAL DE FONTE — perceptível e seguro */
+html {
+  font-size: 18px; /* padrão era 16px */
+}
+
 :root {
   color-scheme: light;
 }
