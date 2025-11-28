@@ -28,6 +28,7 @@ export default function MinistrosPage() {
 }
 
 function MinistrosAdmin() {
+  const SUPERADMIN_EMAIL = "admin@paroquia.com";
   const { user } = useAuth();
 
   const [ministers, setMinisters] = useState<Minister[]>([]);
@@ -35,6 +36,7 @@ function MinistrosAdmin() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const superadmin = ministers.find(m => m.email === SUPERADMIN_EMAIL);
 
   // Novo ministro modal
   const [showNewModal, setShowNewModal] = useState(false);
@@ -148,15 +150,18 @@ function MinistrosAdmin() {
   // ---------------- EDITAR MINISTRO ----------------
 
   const openEdit = (m: Minister) => {
-    setEditMinister(m);
-    setEditName(m.name);
-    setEditEmail(m.email || "");
-    setEditPhone(m.phone || "");
-    setEditIsAdmin(m.is_admin);
-    setEditActive(m.active);
-    setShowEditModal(true);
-    setError(null);
-  };
+  // SUPERADMIN não pode ser editado
+  if (m.email === SUPERADMIN_EMAIL) return;
+
+  setEditMinister(m);
+  setEditName(m.name);
+  setEditEmail(m.email || "");
+  setEditPhone(m.phone || "");
+  setEditIsAdmin(m.is_admin);
+  setEditActive(m.active);
+  setShowEditModal(true);
+  setError(null);
+};
 
   const handleEditSave = async () => {
     if (!isAdmin || !editMinister) return;
@@ -196,35 +201,41 @@ function MinistrosAdmin() {
   // ---------------- EXCLUIR MINISTRO (Edge Function delete-minister) ----------------
 
   const handleDelete = async () => {
-    if (!isAdmin || !editMinister) return;
+  if (!isAdmin || !editMinister) return;
 
-    const ok = window.confirm(
-      "Tem certeza que deseja excluir este ministro? Isso também pode remover o acesso de login vinculado."
+  // SUPERADMIN nunca pode ser excluído
+  if (editMinister.email === SUPERADMIN_EMAIL) {
+    setError("Este ministro não pode ser excluído.");
+    return;
+  }
+
+  const ok = window.confirm(
+    "Tem certeza que deseja excluir este ministro? Isso também pode remover o acesso de login vinculado."
+  );
+  if (!ok) return;
+
+  setSaving(true);
+  setError(null);
+
+  const { data, error } = await supabase.functions.invoke("delete-minister", {
+    body: { ministerId: editMinister.id },
+  });
+
+  setSaving(false);
+
+  if (error || (data && (data as any).error)) {
+    console.error(error || (data as any).error);
+    setError(
+      (data as any)?.error ||
+        "Erro ao excluir ministro. Verifique se a função delete-minister está configurada."
     );
-    if (!ok) return;
+    return;
+  }
 
-    setSaving(true);
-    setError(null);
-
-    const { data, error } = await supabase.functions.invoke("delete-minister", {
-      body: { ministerId: editMinister.id },
-    });
-
-    setSaving(false);
-
-    if (error || (data && (data as any).error)) {
-      console.error(error || (data as any).error);
-      setError(
-        (data as any)?.error ||
-          "Erro ao excluir ministro. Verifique se a função delete-minister está configurada."
-      );
-      return;
-    }
-
-    setShowEditModal(false);
-    setEditMinister(null);
-    await refresh();
-  };
+  setShowEditModal(false);
+  setEditMinister(null);
+  await refresh();
+};
 
   // ---------------- RENDER ----------------
 
@@ -301,7 +312,9 @@ function MinistrosAdmin() {
             </tr>
           </thead>
           <tbody>
-            {ministers.map((m) => (
+            {ministers
+  .filter(m => m.email !== SUPERADMIN_EMAIL)
+  .map((m) => (
               <tr
                 key={m.id}
                 className={
@@ -322,12 +335,15 @@ function MinistrosAdmin() {
                   {m.must_reset_password ? "Pendente" : "OK"}
                 </td>
                 <td className="px-2 py-1 text-center">
-                  <button
-                    onClick={() => openEdit(m)}
-                    className="px-2 py-0.5 border rounded text-[9px] hover:bg-gray-50"
-                  >
-                    Editar
-                  </button>
+                  {/* EDITAR – só aparece se não for o superadmin */}
+{m.email !== SUPERADMIN_EMAIL && (
+  <button
+    onClick={() => openEdit(m)}
+    className="px-2 py-0.5 border rounded text-[9px] hover:bg-gray-50"
+  >
+    Editar
+  </button>
+)}
                 </td>
               </tr>
             ))}
@@ -465,13 +481,16 @@ function MinistrosAdmin() {
               </div>
             </div>
             <div className="flex justify-between items-center gap-2">
-              <button
-                onClick={handleDelete}
-                className="px-2 py-1 text-[9px] rounded border border-red-300 text-red-600 hover:bg-red-50"
-                disabled={saving}
-              >
-                Excluir ministro
-              </button>
+              {/* SUPERADMIN não mostra botão excluir */}
+{editMinister?.email !== SUPERADMIN_EMAIL && (
+  <button
+    onClick={handleDelete}
+    className="px-2 py-1 text-[9px] rounded border border-red-300 text-red-600 hover:bg-red-50"
+    disabled={saving}
+  >
+    Excluir ministro
+  </button>
+)}
               <div className="flex gap-2">
                 <button
                   onClick={() => {

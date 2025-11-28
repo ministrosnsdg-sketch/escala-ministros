@@ -1251,48 +1251,55 @@ function DisponibilidadeInner() {
             {/* Conteúdo modal */}
             <div className="space-y-4 max-h-[70vh] overflow-y-auto px-1">
 
-              {/* Horários Fixos */}
-              {dayHorarios.length > 0 && (
-                <div>
-                  <h4 className="text-xs font-semibold text-gray-700 mb-1">
-                    Missas Fixas
-                  </h4>
+              {/* Horários Fixos (OCULTA quando houver missa extra no mesmo horário) */}
+{dayHorarios.length > 0 && (
+  <div>
+    <h4 className="text-xs font-semibold text-gray-700 mb-1">
+      Missas Fixas
+    </h4>
 
-                  <div className="space-y-2">
-                    {dayHorarios.map((h) => {
-                      const key = `${selectedDate}|${h.id}`;
-                      const checked = monthlyDraft.has(key);
-                      const count = slotCounts[key] || 0;
+    <div className="space-y-2">
+      {dayHorarios.map((h) => {
+        const extraSameTime = dayExtras.some(
+          (e) => e.time === h.time
+        );
 
-                      return (
-                        <div
-                          key={h.id}
-                          className="flex items-center justify-between border rounded-lg px-3 py-2 bg-gray-50"
-                        >
-                          <div>
-                            <div className="text-[11px] font-semibold">
-                              {h.time.slice(0, 5)}h
-                            </div>
-                            <div className="text-[9px] text-gray-600">
-                              Min {h.min_required} • Máx {h.max_allowed} • Atual {count}
-                            </div>
-                          </div>
+        if (extraSameTime) {
+          return null;
+        }
 
-                          <input
-                            type="checkbox"
-                            className="w-4 h-4"
-                            checked={checked}
-                            onChange={() => toggleDraftMonthly(selectedDate, h.id)}
-                            disabled={!canEditSelectedMonth}
-                          />
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
+        const key = `${selectedDate}|${h.id}`;
+        const checked = monthlyDraft.has(key);
+        const count = slotCounts[key] || 0;
 
-              {/* Missas Extras */}
+        return (
+          <div
+            key={h.id}
+            className="flex items-center justify-between border rounded-lg px-3 py-2 bg-gray-50"
+          >
+            <div>
+              <div className="text-[11px] font-semibold">
+                {h.time.slice(0, 5)}h
+              </div>
+              <div className="text-[9px] text-gray-600">
+                Min {h.min_required} • Máx {h.max_allowed} • Atual {count}
+              </div>
+            </div>
+
+            <input
+              type="checkbox"
+              className="w-4 h-4"
+              checked={checked}
+              onChange={() => toggleDraftMonthly(selectedDate, h.id)}
+              disabled={!canEditSelectedMonth}
+            />
+          </div>
+        );
+      })}
+    </div>
+  </div>
+)}
+{/* Missas Extras */}
               {dayExtras.length > 0 && (
                 <div>
                   <h4 className="text-xs font-semibold text-purple-700 mb-1">
