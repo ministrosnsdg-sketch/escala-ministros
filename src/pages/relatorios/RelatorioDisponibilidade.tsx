@@ -50,7 +50,6 @@ function iso(d: Date) {
 }
 
 export default function RelatorioDisponibilidade() {
-  // mês padrão = próximo mês
   const now = new Date();
   const defaultMonth = now.getMonth() === 11 ? 0 : now.getMonth() + 1;
   const defaultYear =
@@ -58,6 +57,8 @@ export default function RelatorioDisponibilidade() {
 
   const [month, setMonth] = useState(defaultMonth);
   const [year, setYear] = useState(defaultYear);
+
+  const [statusFilter, setStatusFilter] = useState("ALL");
 
   const firstDay = useMemo(() => new Date(year, month, 1), [year, month]);
   const lastDay = useMemo(() => new Date(year, month + 1, 0), [year, month]);
@@ -78,14 +79,12 @@ export default function RelatorioDisponibilidade() {
 
   useEffect(() => {
     loadData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [month, year]);
 
   async function loadData() {
     setLoading(true);
     setError(null);
 
-    // horários fixos
     const { data: hData, error: hErr } = await supabase
       .from("horarios")
       .select("*")
@@ -101,7 +100,6 @@ export default function RelatorioDisponibilidade() {
     }
     setHorarios((hData || []) as Horario[]);
 
-    // extras do mês
     const { data: exData, error: exErr } = await supabase
       .from("extras")
       .select("*")
@@ -119,7 +117,6 @@ export default function RelatorioDisponibilidade() {
     }
     setExtras((exData || []) as Extra[]);
 
-    // contagem de disponibilidade em horários fixos
     const { data: cData, error: cErr } = await supabase.rpc(
       "get_slot_availability_counts",
       { start_date: start, end_date: end }
@@ -139,7 +136,6 @@ export default function RelatorioDisponibilidade() {
     });
     setSlotCounts(mapSlots);
 
-    // contagem de disponibilidade em extras
     const { data: exCount, error: exCountErr } = await supabase.rpc(
       "get_extra_availability_counts",
       { start_date: start, end_date: end }
@@ -215,13 +211,23 @@ export default function RelatorioDisponibilidade() {
     [extras, extraCounts]
   );
 
+  function applyStatusFilter(row: { current: number; min: number; max: number }) {
+    const falta = row.current < row.min;
+    const cheio = row.current >= row.max;
+
+    if (statusFilter === "LOW") return falta;
+    if (statusFilter === "FULL") return cheio;
+    if (statusFilter === "OK") return !falta && !cheio;
+    return true; // ALL
+  }
+
   return (
     <section className="space-y-3">
-      {/* Seletor de mês */}
       <div className="flex flex-wrap gap-2 items-center text-[9px]">
         <div className="font-semibold text-[#4A6FA5]">
           Cobertura — {label}
         </div>
+
         <select
           className="border rounded px-2 py-1 text-[9px]"
           value={month}
@@ -233,6 +239,7 @@ export default function RelatorioDisponibilidade() {
             </option>
           ))}
         </select>
+
         <input
           type="number"
           className="border rounded px-2 py-1 w-16 text-[9px]"
@@ -242,6 +249,18 @@ export default function RelatorioDisponibilidade() {
             if (v > 1900) setYear(v);
           }}
         />
+
+        {/* NOVO FILTRO DE STATUS */}
+        <select
+          className="border rounded px-2 py-1 text-[9px]"
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+        >
+          <option value="ALL">Todos os status</option>
+          <option value="LOW">Abaixo do mínimo</option>
+          <option value="FULL">Capacidade máxima</option>
+          <option value="OK">OK</option>
+        </select>
       </div>
 
       <div className="bg-[#F7FAFF] border border-[#D6E6F7] rounded-xl px-3 py-2 text-[9px] text-[#3F5F8F]">
@@ -257,30 +276,27 @@ export default function RelatorioDisponibilidade() {
         <p className="text-[10px] text-red-600">{error}</p>
       ) : (
         <>
-          {/* Horários fixos */}
           <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
             <div className="px-3 py-2 bg-[#D6E6F7] text-[10px] text-[#3F5F8F] font-semibold">
               Missas fixas
             </div>
-            {fixedRows.length === 0 ? (
-              <div className="p-3 text-[9px] text-gray-500">
-                Nenhum horário para este mês.
-              </div>
-            ) : (
-              <table className="min-w-full text-[9px]">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-2 py-1 text-left">Data</th>
-                    <th className="px-2 py-1 text-left">Dia</th>
-                    <th className="px-2 py-1 text-center">Hora</th>
-                    <th className="px-2 py-1 text-center">Mín.</th>
-                    <th className="px-2 py-1 text-center">Máx.</th>
-                    <th className="px-2 py-1 text-center">Selecionados</th>
-                    <th className="px-2 py-1 text-center">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {fixedRows.map((r, i) => {
+
+            <table className="min-w-full text-[9px]">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-2 py-1 text-left">Data</th>
+                  <th className="px-2 py-1 text-left">Dia</th>
+                  <th className="px-2 py-1 text-center">Hora</th>
+                  <th className="px-2 py-1 text-center">Mín.</th>
+                  <th className="px-2 py-1 text-center">Máx.</th>
+                  <th className="px-2 py-1 text-center">Selecionados</th>
+                  <th className="px-2 py-1 text-center">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {fixedRows
+                  .filter(applyStatusFilter)
+                  .map((r, i) => {
                     const falta = r.current < r.min;
                     const cheio = r.current >= r.max;
                     const status = falta
@@ -293,6 +309,7 @@ export default function RelatorioDisponibilidade() {
                       : cheio
                       ? "text-yellow-600"
                       : "text-green-600";
+
                     return (
                       <tr
                         key={i}
@@ -302,56 +319,42 @@ export default function RelatorioDisponibilidade() {
                           {r.date.split("-").reverse().join("/")}
                         </td>
                         <td className="px-2 py-1">{r.weekday}</td>
-                        <td className="px-2 py-1 text-center">
-                          {r.time}h
-                        </td>
-                        <td className="px-2 py-1 text-center">
-                          {r.min}
-                        </td>
-                        <td className="px-2 py-1 text-center">
-                          {r.max}
-                        </td>
-                        <td className="px-2 py-1 text-center">
-                          {r.current}
-                        </td>
-                        <td
-                          className={`px-2 py-1 text-center ${color}`}
-                        >
+                        <td className="px-2 py-1 text-center">{r.time}h</td>
+                        <td className="px-2 py-1 text-center">{r.min}</td>
+                        <td className="px-2 py-1 text-center">{r.max}</td>
+                        <td className="px-2 py-1 text-center">{r.current}</td>
+                        <td className={`px-2 py-1 text-center ${color}`}>
                           {status}
                         </td>
                       </tr>
                     );
                   })}
-                </tbody>
-              </table>
-            )}
+              </tbody>
+            </table>
           </div>
 
-          {/* Missas extras */}
           <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
             <div className="px-3 py-2 bg-[#F2E3FF] text-[10px] text-[#5B3FA6] font-semibold">
               Missas extras
             </div>
-            {extraRows.length === 0 ? (
-              <div className="p-3 text-[9px] text-gray-500">
-                Nenhuma missa extra cadastrada para este mês.
-              </div>
-            ) : (
-              <table className="min-w-full text-[9px]">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-2 py-1 text-left">Data</th>
-                    <th className="px-2 py-1 text-left">Dia</th>
-                    <th className="px-2 py-1 text-left">Título</th>
-                    <th className="px-2 py-1 text-center">Hora</th>
-                    <th className="px-2 py-1 text-center">Mín.</th>
-                    <th className="px-2 py-1 text-center">Máx.</th>
-                    <th className="px-2 py-1 text-center">Selecionados</th>
-                    <th className="px-2 py-1 text-center">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {extraRows.map((e) => {
+
+            <table className="min-w-full text-[9px]">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-2 py-1 text-left">Data</th>
+                  <th className="px-2 py-1 text-left">Dia</th>
+                  <th className="px-2 py-1 text-left">Título</th>
+                  <th className="px-2 py-1 text-center">Hora</th>
+                  <th className="px-2 py-1 text-center">Mín.</th>
+                  <th className="px-2 py-1 text-center">Máx.</th>
+                  <th className="px-2 py-1 text-center">Selecionados</th>
+                  <th className="px-2 py-1 text-center">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {extraRows
+                  .filter(applyStatusFilter)
+                  .map((e) => {
                     const falta = e.current < e.min;
                     const cheio = e.current >= e.max;
                     const status = falta
@@ -359,6 +362,7 @@ export default function RelatorioDisponibilidade() {
                       : cheio
                       ? "Capacidade máxima"
                       : "OK";
+
                     const color = falta
                       ? "text-red-600"
                       : cheio
@@ -375,29 +379,18 @@ export default function RelatorioDisponibilidade() {
                         </td>
                         <td className="px-2 py-1">{e.weekday}</td>
                         <td className="px-2 py-1">{e.title}</td>
-                        <td className="px-2 py-1 text-center">
-                          {e.time}h
-                        </td>
-                        <td className="px-2 py-1 text-center">
-                          {e.min}
-                        </td>
-                        <td className="px-2 py-1 text-center">
-                          {e.max}
-                        </td>
-                        <td className="px-2 py-1 text-center">
-                          {e.current}
-                        </td>
-                        <td
-                          className={`px-2 py-1 text-center ${color}`}
-                        >
+                        <td className="px-2 py-1 text-center">{e.time}h</td>
+                        <td className="px-2 py-1 text-center">{e.min}</td>
+                        <td className="px-2 py-1 text-center">{e.max}</td>
+                        <td className="px-2 py-1 text-center">{e.current}</td>
+                        <td className={`px-2 py-1 text-center ${color}`}>
                           {status}
                         </td>
                       </tr>
                     );
                   })}
-                </tbody>
-              </table>
-            )}
+              </tbody>
+            </table>
           </div>
         </>
       )}
