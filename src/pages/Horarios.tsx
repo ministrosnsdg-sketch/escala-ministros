@@ -1,4 +1,3 @@
-// src/pages/Horarios.tsx
 import { useEffect, useState } from "react";
 import { Layout } from "../components/Layout";
 import { RequireAuth } from "../components/RequireAuth";
@@ -7,8 +6,8 @@ import { useAuth } from "../context/AuthContext";
 
 type Horario = {
   id: number;
-  weekday: number; // 0-6
-  time: string; // "HH:MM:SS"
+  weekday: number;
+  time: string;
   min_required: number;
   max_allowed: number;
   active: boolean;
@@ -44,14 +43,12 @@ function HorariosInner() {
   const [error, setError] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
 
-  // Modal novo
   const [showNewModal, setShowNewModal] = useState(false);
   const [newWeekday, setNewWeekday] = useState<number>(0);
   const [newTime, setNewTime] = useState<string>("07:00");
   const [newMin, setNewMin] = useState<number>(1);
   const [newMax, setNewMax] = useState<number>(4);
 
-  // Modal editar
   const [showEditModal, setShowEditModal] = useState(false);
   const [editHorario, setEditHorario] = useState<Horario | null>(null);
   const [editWeekday, setEditWeekday] = useState<number>(0);
@@ -65,25 +62,22 @@ function HorariosInner() {
       setLoading(true);
       setError(null);
 
-      // Verifica se usuário é admin
       if (user) {
-        const { data: me, error: meError } = await supabase
+        const { data: me } = await supabase
           .from("ministers")
           .select("is_admin")
           .eq("user_id", user.id)
           .maybeSingle();
-
-        if (!meError && me) setIsAdmin(!!me.is_admin);
+        if (me) setIsAdmin(!!me.is_admin);
       }
 
       const { data, error } = await supabase
         .from("horarios")
         .select("*")
-        .order("weekday", { ascending: true })
-        .order("time", { ascending: true });
+        .order("weekday")
+        .order("time");
 
       if (error) {
-        console.error(error);
         setError("Não foi possível carregar os horários.");
         setLoading(false);
         return;
@@ -97,28 +91,19 @@ function HorariosInner() {
   }, [user]);
 
   const refresh = async () => {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from("horarios")
       .select("*")
-      .order("weekday", { ascending: true })
-      .order("time", { ascending: true });
-
-    if (!error && data) {
-      setHorarios(data as Horario[]);
-    }
+      .order("weekday")
+      .order("time");
+    if (data) setHorarios(data as Horario[]);
   };
-
-  // -------- NOVO HORÁRIO --------
 
   const handleCreate = async () => {
     if (!isAdmin) return;
 
-    if (!newTime) {
-      setError("Informe um horário válido.");
-      return;
-    }
-    if (newMin < 1 || newMax < newMin) {
-      setError("Verifique os valores mínimo e máximo.");
+    if (!newTime || newMin < 1 || newMax < newMin) {
+      setError("Verifique os valores mínimo, máximo e horário.");
       return;
     }
 
@@ -136,7 +121,6 @@ function HorariosInner() {
     setSaving(false);
 
     if (error) {
-      console.error(error);
       setError("Erro ao criar horário.");
       return;
     }
@@ -149,12 +133,10 @@ function HorariosInner() {
     await refresh();
   };
 
-  // -------- EDITAR HORÁRIO --------
-
   const openEdit = (h: Horario) => {
     setEditHorario(h);
     setEditWeekday(h.weekday);
-    setEditTime(h.time.slice(0, 5)); // HH:MM
+    setEditTime(h.time.slice(0, 5));
     setEditMin(h.min_required);
     setEditMax(h.max_allowed);
     setEditActive(h.active);
@@ -165,12 +147,8 @@ function HorariosInner() {
   const handleEditSave = async () => {
     if (!isAdmin || !editHorario) return;
 
-    if (!editTime) {
-      setError("Informe um horário válido.");
-      return;
-    }
-    if (editMin < 1 || editMax < editMin) {
-      setError("Verifique os valores mínimo e máximo.");
+    if (!editTime || editMin < 1 || editMax < editMin) {
+      setError("Verifique os valores mínimo, máximo e horário.");
       return;
     }
 
@@ -191,7 +169,6 @@ function HorariosInner() {
     setSaving(false);
 
     if (error) {
-      console.error(error);
       setError("Erro ao salvar alterações.");
       return;
     }
@@ -201,38 +178,24 @@ function HorariosInner() {
     await refresh();
   };
 
-  // -------- EXCLUIR HORÁRIO --------
-
   const handleDelete = async () => {
     if (!isAdmin || !editHorario) return;
 
-    const confirm = window.confirm(
-      "Tem certeza que deseja excluir este horário? Escalas relacionadas podem ser afetadas."
+    const confirmDelete = window.confirm(
+      "Tem certeza que deseja excluir este horário?"
     );
-    if (!confirm) return;
+    if (!confirmDelete) return;
 
     setSaving(true);
     setError(null);
 
-    const { error } = await supabase
-      .from("horarios")
-      .delete()
-      .eq("id", editHorario.id);
+    await supabase.from("horarios").delete().eq("id", editHorario.id);
 
     setSaving(false);
-
-    if (error) {
-      console.error(error);
-      setError("Erro ao excluir horário.");
-      return;
-    }
-
     setShowEditModal(false);
     setEditHorario(null);
     await refresh();
   };
-
-  // -------- RENDER --------
 
   if (loading) {
     return (
@@ -256,8 +219,7 @@ function HorariosInner() {
         Horários de Missa - Fixos
       </h2>
       <p className="text-[11px] text-gray-700 mb-3">
-        Cadastre aqui os horários fixos de missa para cada dia da semana. Estes
-        horários serão usados na disponibilidade e na geração da escala.
+        Cadastre aqui os horários fixos de missa para cada dia da semana.
       </p>
 
       {error && (
@@ -307,9 +269,7 @@ function HorariosInner() {
                 <tbody>
                   {g.items.map((h) => (
                     <tr key={h.id} className="border-t border-gray-100">
-                      <td className="px-2 py-1">
-                        {h.time.slice(0, 5)}h
-                      </td>
+                      <td className="px-2 py-1">{h.time.slice(0, 5)}h</td>
                       <td className="px-2 py-1 text-center">
                         {h.min_required}
                       </td>
@@ -338,7 +298,6 @@ function HorariosInner() {
         ))}
       </div>
 
-      {/* Modal Novo Horário */}
       {showNewModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-sm border border-[#D6E6F7] p-4">
@@ -367,16 +326,11 @@ function HorariosInner() {
                   Horário
                 </label>
                 <input
-  type="tel"
-  inputMode="numeric"
-  pattern="[0-9]*"
-  className="w-full border rounded px-2 py-1 text-sm"
-  value={STATE}
-  onChange={(e) => {
-    const n = e.target.value.replace(/\D/g, "");
-    setSTATE(n === "" ? 0 : Number(n));
-  }}
-/>
+                  type="time"
+                  className="w-full border rounded px-2 py-1 text-sm"
+                  value={newTime}
+                  onChange={(e) => setNewTime(e.target.value)}
+                />
               </div>
               <div className="flex gap-2">
                 <div className="flex-1">
@@ -384,13 +338,15 @@ function HorariosInner() {
                     Mínimo
                   </label>
                   <input
-                    type="number"
-                    min={1}
+                    type="tel"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
                     className="w-full border rounded px-2 py-1 text-sm"
                     value={newMin}
-                    onChange={(e) =>
-                      setNewMin(Number(e.target.value) || 1)
-                    }
+                    onChange={(e) => {
+                      const n = e.target.value.replace(/\D/g, "");
+                      setNewMin(n === "" ? 0 : Number(n));
+                    }}
                   />
                 </div>
                 <div className="flex-1">
@@ -398,16 +354,16 @@ function HorariosInner() {
                     Máximo
                   </label>
                   <input
-  type="tel"
-  inputMode="numeric"
-  pattern="[0-9]*"
-  className="w-full border rounded px-2 py-1 text-sm"
-  value={STATE}
-  onChange={(e) => {
-    const n = e.target.value.replace(/\D/g, "");
-    setSTATE(n === "" ? 0 : Number(n));
-  }}
-/>
+                    type="tel"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    className="w-full border rounded px-2 py-1 text-sm"
+                    value={newMax}
+                    onChange={(e) => {
+                      const n = e.target.value.replace(/\D/g, "");
+                      setNewMax(n === "" ? 0 : Number(n));
+                    }}
+                  />
                 </div>
               </div>
             </div>
@@ -431,7 +387,6 @@ function HorariosInner() {
         </div>
       )}
 
-      {/* Modal Editar Horário */}
       {showEditModal && editHorario && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-sm border border-[#D6E6F7] p-4">
@@ -457,6 +412,7 @@ function HorariosInner() {
                   ))}
                 </select>
               </div>
+
               <div>
                 <label className="block text-[10px] text-gray-600 mb-1">
                   Horário
@@ -468,42 +424,43 @@ function HorariosInner() {
                   onChange={(e) => setEditTime(e.target.value)}
                 />
               </div>
+
               <div className="flex gap-2">
                 <div className="flex-1">
                   <label className="block text-[10px] text-gray-600 mb-1">
                     Mínimo
                   </label>
                   <input
-  type="tel"
-  inputMode="numeric"
-  pattern="[0-9]*"
-  className="w-full border rounded px-2 py-1 text-sm"
-  value={STATE}
-  onChange={(e) => {
-    const n = e.target.value.replace(/\D/g, "");
-    setSTATE(n === "" ? 0 : Number(n));
-  }}
-/>
-
+                    type="tel"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    className="w-full border rounded px-2 py-1 text-sm"
+                    value={editMin}
+                    onChange={(e) => {
+                      const n = e.target.value.replace(/\D/g, "");
+                      setEditMin(n === "" ? 0 : Number(n));
+                    }}
+                  />
                 </div>
+
                 <div className="flex-1">
                   <label className="block text-[10px] text-gray-600 mb-1">
                     Máximo
                   </label>
                   <input
-  type="tel"
-  inputMode="numeric"
-  pattern="[0-9]*"
-  className="w-full border rounded px-2 py-1 text-sm"
-  value={STATE}
-  onChange={(e) => {
-    const n = e.target.value.replace(/\D/g, "");
-    setSTATE(n === "" ? 0 : Number(n));
-  }}
-/>
-
+                    type="tel"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    className="w-full border rounded px-2 py-1 text-sm"
+                    value={editMax}
+                    onChange={(e) => {
+                      const n = e.target.value.replace(/\D/g, "");
+                      setEditMax(n === "" ? 0 : Number(n));
+                    }}
+                  />
                 </div>
               </div>
+
               <div className="flex items-center gap-2 mt-1">
                 <label className="flex items-center gap-1 text-[10px] text-gray-700">
                   <input
@@ -515,6 +472,7 @@ function HorariosInner() {
                 </label>
               </div>
             </div>
+
             <div className="flex justify-between items-center gap-2">
               <button
                 onClick={handleDelete}
@@ -523,6 +481,7 @@ function HorariosInner() {
               >
                 Excluir
               </button>
+
               <div className="flex gap-2">
                 <button
                   onClick={() => {
@@ -534,6 +493,7 @@ function HorariosInner() {
                 >
                   Cancelar
                 </button>
+
                 <button
                   onClick={handleEditSave}
                   className="px-3 py-1 text-[10px] rounded bg-[#4A6FA5] text-white hover:bg-[#3F5F8F] disabled:opacity-60"

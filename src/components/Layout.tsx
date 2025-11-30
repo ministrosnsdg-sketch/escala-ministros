@@ -18,8 +18,8 @@ const COMMON_MENU: MenuItem[] = [
 
 const ADMIN_EXTRA_MENU: MenuItem[] = [
   { path: "/ministros", label: "Ministros" },
-  { path: "/horarios", label: "Horários de Missa" },
-  { path: "/extras", label: "Missas Extras" },
+  { path: "/horarios", label: "Horários de Missas" },
+  { path: "/extras", label: "Missas Solenes" },
   { path: "/relatorios", label: "Administração" },
   { path: "/exportar", label: "Exportar" },
 ];
