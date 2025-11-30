@@ -367,11 +367,16 @@ function HorariosInner() {
                   Horário
                 </label>
                 <input
-                  type="time"
-                  className="w-full border rounded px-2 py-1 text-sm"
-                  value={newTime}
-                  onChange={(e) => setNewTime(e.target.value)}
-                />
+  type="tel"
+  inputMode="numeric"
+  pattern="[0-9]*"
+  className="w-full border rounded px-2 py-1 text-sm"
+  value={newMin}
+  onChange={(e) => {
+    const n = e.target.value.replace(/\D/g, "");
+    setNewMin(n === "" ? 0 : Number(n));
+  }}
+/>
               </div>
               <div className="flex gap-2">
                 <div className="flex-1">

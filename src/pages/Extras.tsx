@@ -399,14 +399,16 @@ function ExtrasInner() {
                     Máximo
                   </label>
                   <input
-                    type="number"
-                    min={1}
-                    className="w-full border rounded px-2 py-1 text-sm"
-                    value={newMax}
-                    onChange={(e) =>
-                      setNewMax(Number(e.target.value) || 1)
-                    }
-                  />
+  type="tel"
+  inputMode="numeric"
+  pattern="[0-9]*"
+  className="w-full border rounded px-2 py-1 text-sm"
+  value={editMin}
+  onChange={(e) => {
+    const n = e.target.value.replace(/\D/g, "");
+    setEditMin(n === "" ? 0 : Number(n));
+  }}
+/>
                 </div>
               </div>
             </div>
