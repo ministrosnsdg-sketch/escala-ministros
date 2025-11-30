@@ -386,10 +386,10 @@ function ExtrasInner() {
   inputMode="numeric"
   pattern="[0-9]*"
   className="w-full border rounded px-2 py-1 text-sm"
-  value={editMin}
+  value={newMin}
   onChange={(e) => {
     const n = e.target.value.replace(/\D/g, "");
-    setEditMin(n === "" ? 0 : Number(n));
+    setNewMin(n === "" ? 0 : Number(n));
   }}
 />
 
@@ -403,12 +403,13 @@ function ExtrasInner() {
   inputMode="numeric"
   pattern="[0-9]*"
   className="w-full border rounded px-2 py-1 text-sm"
-  value={editMin}
+  value={newMax}
   onChange={(e) => {
     const n = e.target.value.replace(/\D/g, "");
-    setEditMin(n === "" ? 0 : Number(n));
+    setNewMax(n === "" ? 0 : Number(n));
   }}
 />
+
                 </div>
               </div>
             </div>
