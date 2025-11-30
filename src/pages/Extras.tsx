@@ -382,14 +382,17 @@ function ExtrasInner() {
                     Mínimo
                   </label>
                   <input
-                    type="number"
-                    min={1}
-                    className="w-full border rounded px-2 py-1 text-sm"
-                    value={newMin}
-                    onChange={(e) =>
-                      setNewMin(Number(e.target.value) || 1)
-                    }
-                  />
+  type="tel"
+  inputMode="numeric"
+  pattern="[0-9]*"
+  className="w-full border rounded px-2 py-1 text-sm"
+  value={editMin}
+  onChange={(e) => {
+    const n = e.target.value.replace(/\D/g, "");
+    setEditMin(n === "" ? 0 : Number(n));
+  }}
+/>
+
                 </div>
                 <div className="flex-1">
                   <label className="block text-[10px] text-gray-600 mb-1">

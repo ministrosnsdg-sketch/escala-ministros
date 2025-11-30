@@ -972,25 +972,31 @@ function DisponibilidadeInner() {
         </div>
         <div className="flex gap-2 items-center">
           <select
-            className="border rounded px-2 py-1 text-[10px]"
-            value={month}
-            onChange={(e) => setMonth(Number(e.target.value))}
-          >
-            {MONTH_NAMES.map((name, idx) => (
-              <option key={idx} value={idx}>
-                {name}
-              </option>
-            ))}
-          </select>
-          <input
-            type="number"
-            className="border rounded px-2 py-1 w-16 text-[10px]"
-            value={year}
-            onChange={(e) => {
-              const v = Number(e.target.value);
-              if (v > 1900) setYear(v);
-            }}
-          />
+  className="border rounded px-2 py-1 text-[10px]"
+  value={month}
+  onChange={(e) => setMonth(Number(e.target.value))}
+>
+  {MONTH_NAMES.map((name, idx) => (
+    <option key={idx} value={idx}>
+      {name}
+    </option>
+  ))}
+</select>
+
+<select
+  className="border rounded px-2 py-1 text-[10px] w-20"
+  value={year}
+  onChange={(e) => setYear(Number(e.target.value))}
+>
+  {Array.from({ length: 10 }).map((_, i) => {
+    const y = new Date().getFullYear() - 2 + i; // 2 anos antes, 7 depois (ajustável)
+    return (
+      <option key={y} value={y}>
+        {y}
+      </option>
+    );
+  })}
+</select>
         </div>
       </div>
 

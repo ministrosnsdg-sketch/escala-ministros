@@ -451,25 +451,31 @@ function EscalaInner() {
 
         <div className="flex gap-2 items-center text-[10px]">
           <select
-            className="border rounded px-2 py-1"
-            value={month}
-            onChange={(e) => setMonth(Number(e.target.value))}
-          >
-            {MONTH_NAMES.map((m, i) => (
-              <option key={i} value={i}>
-                {m}
-              </option>
-            ))}
-          </select>
-          <input
-            type="number"
-            className="border rounded px-2 py-1 w-20"
-            value={year}
-            onChange={(e) => {
-              const v = Number(e.target.value);
-              if (v > 1900) setYear(v);
-            }}
-          />
+  className="border rounded px-2 py-1"
+  value={month}
+  onChange={(e) => setMonth(Number(e.target.value))}
+>
+  {MONTH_NAMES.map((m, i) => (
+    <option key={i} value={i}>
+      {m}
+    </option>
+  ))}
+</select>
+
+<select
+  className="border rounded px-2 py-1 w-20"
+  value={year}
+  onChange={(e) => setYear(Number(e.target.value))}
+>
+  {Array.from({ length: 10 }).map((_, i) => {
+    const y = new Date().getFullYear() - 2 + i;
+    return (
+      <option key={y} value={y}>
+        {y}
+      </option>
+    );
+  })}
+</select>
         </div>
       </div>
 
