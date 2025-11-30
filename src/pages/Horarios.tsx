@@ -371,10 +371,10 @@ function HorariosInner() {
   inputMode="numeric"
   pattern="[0-9]*"
   className="w-full border rounded px-2 py-1 text-sm"
-  value={newMin}
+  value={STATE}
   onChange={(e) => {
     const n = e.target.value.replace(/\D/g, "");
-    setNewMin(n === "" ? 0 : Number(n));
+    setSTATE(n === "" ? 0 : Number(n));
   }}
 />
               </div>
@@ -398,14 +398,16 @@ function HorariosInner() {
                     Máximo
                   </label>
                   <input
-                    type="number"
-                    min={1}
-                    className="w-full border rounded px-2 py-1 text-sm"
-                    value={newMax}
-                    onChange={(e) =>
-                      setNewMax(Number(e.target.value) || 1)
-                    }
-                  />
+  type="tel"
+  inputMode="numeric"
+  pattern="[0-9]*"
+  className="w-full border rounded px-2 py-1 text-sm"
+  value={STATE}
+  onChange={(e) => {
+    const n = e.target.value.replace(/\D/g, "");
+    setSTATE(n === "" ? 0 : Number(n));
+  }}
+/>
                 </div>
               </div>
             </div>
@@ -472,28 +474,34 @@ function HorariosInner() {
                     Mínimo
                   </label>
                   <input
-                    type="number"
-                    min={1}
-                    className="w-full border rounded px-2 py-1 text-sm"
-                    value={editMin}
-                    onChange={(e) =>
-                      setEditMin(Number(e.target.value) || 1)
-                    }
-                  />
+  type="tel"
+  inputMode="numeric"
+  pattern="[0-9]*"
+  className="w-full border rounded px-2 py-1 text-sm"
+  value={STATE}
+  onChange={(e) => {
+    const n = e.target.value.replace(/\D/g, "");
+    setSTATE(n === "" ? 0 : Number(n));
+  }}
+/>
+
                 </div>
                 <div className="flex-1">
                   <label className="block text-[10px] text-gray-600 mb-1">
                     Máximo
                   </label>
                   <input
-                    type="number"
-                    min={1}
-                    className="w-full border rounded px-2 py-1 text-sm"
-                    value={editMax}
-                    onChange={(e) =>
-                      setEditMax(Number(e.target.value) || 1)
-                    }
-                  />
+  type="tel"
+  inputMode="numeric"
+  pattern="[0-9]*"
+  className="w-full border rounded px-2 py-1 text-sm"
+  value={STATE}
+  onChange={(e) => {
+    const n = e.target.value.replace(/\D/g, "");
+    setSTATE(n === "" ? 0 : Number(n));
+  }}
+/>
+
                 </div>
               </div>
               <div className="flex items-center gap-2 mt-1">
