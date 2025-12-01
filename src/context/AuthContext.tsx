@@ -22,31 +22,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const init = async () => {
-      // 🔵 Restaura sessão persistida no navegador
+      /**
+       * 🔵 CORREÇÃO:
+       * Espera o Supabase realmente restaurar a sessão
+       * antes de definir user = null automaticamente.
+       */
       const {
         data: { session },
       } = await supabase.auth.getSession();
 
-      setUser(session?.user ?? null);
+      if (session?.user) {
+        setUser(session.user);
+      }
+
       setLoading(false);
     };
 
     init();
 
-    // 🔵 Mantém usuário atualizado em qualquer mudança
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
     });
 
-    return () => {
-      subscription.unsubscribe();
-    };
+    return () => subscription.unsubscribe();
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    // 🔵 Supabase já persistirá sessão automaticamente
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -56,11 +59,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: error.message };
     }
 
+    // após login, garantir leitura da sessão real
     const {
-  data: { session },
-} = await supabase.auth.getSession();
+      data: { session },
+    } = await supabase.auth.getSession();
 
-setUser(session?.user ?? null);
+    setUser(session?.user ?? null);
+
     return {};
   };
 
