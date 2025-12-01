@@ -1050,17 +1050,17 @@ function DisponibilidadeInner() {
       )}
 {/* ================= RECORRÊNCIA ================= */}
 {canEditSelectedMonth && (
-  <div className="bg-[#F7FAFF] border border-[#D6E6F7] rounded-2xl p-3 text-[9px] space-y-2">
+  <div className="bg-[#FFF7EC] border border-[#FCD9A5] rounded-2xl p-3 text-[9px] space-y-2">
 
     <div className="flex flex-col sm:flex-row sm:items-end gap-2">
 
       {/* Dia da semana */}
       <div className="flex-1">
-        <label className="block text-[9px] text-[#4A6FA5] mb-1">
+        <label className="block text-[9px] text-[#EA580C] mb-1">
           Recorrência — Dia da semana
         </label>
         <select
-          className="w-full border border-[#D6E6F7] rounded px-2 py-1 text-[10px]"
+          className="w-full border border-[#FCD9A5] rounded px-2 py-1 text-[10px]"
           value={recWeekday === "" ? "" : recWeekday}
           onChange={(e) =>
             setRecWeekday(
@@ -1079,11 +1079,11 @@ function DisponibilidadeInner() {
 
       {/* Horário */}
       <div className="flex-1">
-        <label className="block text-[9px] text-[#4A6FA5] mb-1">
+        <label className="block text-[9px] text-[#EA580C] mb-1">
           Horário fixo
         </label>
         <select
-          className="w-full border border-[#D6E6F7] rounded px-2 py-1 text-[10px]"
+          className="w-full border border-[#FCD9A5] rounded px-2 py-1 text-[10px]"
           value={recHorarioId === "" ? "" : recHorarioId}
           onChange={(e) =>
             setRecHorarioId(
@@ -1105,25 +1105,29 @@ function DisponibilidadeInner() {
 
       {/* Botões */}
       <div className="flex flex-col sm:flex-row gap-1 sm:ml-2">
+
+        {/* Aplicar */}
         <button
           onClick={() => applyRecurrence("set")}
           disabled={
             recWeekday === "" || recHorarioId === "" || savingAll
           }
-          className="px-3 py-1.5 rounded-full bg-[#4A6FA5] text-white text-[9px] hover:bg-[#3F5F8F] disabled:opacity-50"
+          className="px-3 py-1.5 rounded-full bg-[#F97316] text-white text-[9px] hover:bg-[#EA580C] disabled:opacity-50"
         >
           Aplicar no mês
         </button>
 
+        {/* Limpar */}
         <button
           onClick={() => applyRecurrence("clear")}
           disabled={
             recWeekday === "" || recHorarioId === "" || savingAll
           }
-          className="px-3 py-1.5 rounded-full border border-gray-300 text-[9px] text-gray-700 hover:bg-gray-100 disabled:opacity-50"
+          className="px-3 py-1.5 rounded-full border border-[#FCD9A5] text-[9px] text-[#EA580C] hover:bg-[#FFF1E0] disabled:opacity-50"
         >
           Limpar recorrência
         </button>
+
       </div>
     </div>
 

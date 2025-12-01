@@ -79,7 +79,6 @@ export default function Login() {
     setLoading(true);
 
     try {
-      supabase.auth.setSession({ persistSession: rememberMe });
       const { error: signInError } = await signIn(
         email.trim(),
         password.trim()
@@ -125,8 +124,11 @@ export default function Login() {
         return;
       }
 
-     // Não forçar logout ao fechar o navegador
-window.onbeforeunload = null;
+      if (!rememberMe) {
+        window.onbeforeunload = () => supabase.auth.signOut();
+      } else {
+        window.onbeforeunload = null;
+      }
 
       setLoading(false);
       navigate("/escala", { replace: true });

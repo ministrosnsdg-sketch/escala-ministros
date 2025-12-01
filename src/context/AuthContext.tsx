@@ -22,19 +22,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const init = async () => {
-      /**
-       * 🔵 CORREÇÃO:
-       * Espera o Supabase realmente restaurar a sessão
-       * antes de definir user = null automaticamente.
-       */
       const {
         data: { session },
       } = await supabase.auth.getSession();
-
-      if (session?.user) {
-        setUser(session.user);
-      }
-
+      setUser(session?.user ?? null);
       setLoading(false);
     };
 
@@ -46,7 +37,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(session?.user ?? null);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {
@@ -59,13 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { error: error.message };
     }
 
-    // após login, garantir leitura da sessão real
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    setUser(session?.user ?? null);
-
+    setUser(data.user);
     return {};
   };
 
