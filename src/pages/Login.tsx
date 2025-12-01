@@ -125,11 +125,8 @@ export default function Login() {
         return;
       }
 
-      if (!rememberMe) {
-        window.onbeforeunload = () => supabase.auth.signOut();
-      } else {
-        window.onbeforeunload = null;
-      }
+     // Não forçar logout ao fechar o navegador
+window.onbeforeunload = null;
 
       setLoading(false);
       navigate("/escala", { replace: true });
