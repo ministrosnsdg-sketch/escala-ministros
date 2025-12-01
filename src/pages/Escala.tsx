@@ -429,49 +429,36 @@ function EscalaInner() {
   return (
     <div className="max-w-5xl mx-auto space-y-4">
       {/* Cabeçalho / legenda */}
-      <div className="flex flex-wrap gap-2 items-end justify-between">
-        <div>
-          <h2 className="text-lg font-semibold text-[#4A6FA5]">Escala</h2>
-          <p className="text-[10px] text-gray-700">
-            Visualização do seu agendamento mensal.
-            <span className="inline-flex items-center gap-1 ml-2 mr-3">
-              <span className="w-2 h-2 rounded-full bg-green-600 inline-block" />
-              <span>
-                {useAvailabilityFallback
-                  ? "Você está disponível"
-                  : "Você está escalado"}
-              </span>
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-purple-600 inline-block" />
-              <span>Há missas extras no dia</span>
-            </span>
-          </p>
-        </div>
+      <div className="flex gap-2 items-center text-[10px]">
+  {/* Seletor de Mês — igual ao da Disponibilidade */}
+  <select
+    className="border rounded px-2 py-1 text-[10px]"
+    value={month}
+    onChange={(e) => setMonth(Number(e.target.value))}
+  >
+    {MONTH_NAMES.map((name, idx) => (
+      <option key={idx} value={idx}>
+        {name.charAt(0).toUpperCase() + name.slice(1).toLowerCase()}
+      </option>
+    ))}
+  </select>
 
-        <div className="flex gap-2 items-center text-[10px]">
-          <select
-            className="border rounded px-2 py-1"
-            value={month}
-            onChange={(e) => setMonth(Number(e.target.value))}
-          >
-            {MONTH_NAMES.map((m, i) => (
-              <option key={i} value={i}>
-                {m}
-              </option>
-            ))}
-          </select>
-          <input
-            type="number"
-            className="border rounded px-2 py-1 w-20"
-            value={year}
-            onChange={(e) => {
-              const v = Number(e.target.value);
-              if (v > 1900) setYear(v);
-            }}
-          />
-        </div>
-      </div>
+  {/* Seletor de Ano — igual ao da Disponibilidade */}
+  <select
+    className="border rounded px-2 py-1 text-[10px] w-20"
+    value={year}
+    onChange={(e) => setYear(Number(e.target.value))}
+  >
+    {Array.from({ length: 10 }).map((_, i) => {
+      const y = new Date().getFullYear() - 2 + i;
+      return (
+        <option key={y} value={y}>
+          {y}
+        </option>
+      );
+    })}
+  </select>
+</div>
 
       {/* Calendário */}
       <div className="bg-white border border-gray-200 rounded-xl p-3">
