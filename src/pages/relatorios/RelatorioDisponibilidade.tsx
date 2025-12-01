@@ -338,59 +338,61 @@ export default function RelatorioDisponibilidade() {
               Missas extras
             </div>
 
-            <table className="min-w-full text-[9px]">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-2 py-1 text-left">Data</th>
-                  <th className="px-2 py-1 text-left">Dia</th>
-                  <th className="px-2 py-1 text-left">Título</th>
-                  <th className="px-2 py-1 text-center">Hora</th>
-                  <th className="px-2 py-1 text-center">Mín.</th>
-                  <th className="px-2 py-1 text-center">Máx.</th>
-                  <th className="px-2 py-1 text-center">Selecionados</th>
-                  <th className="px-2 py-1 text-center">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {extraRows
-                  .filter(applyStatusFilter)
-                  .map((e) => {
-                    const falta = e.current < e.min;
-                    const cheio = e.current >= e.max;
-                    const status = falta
-                      ? "Abaixo do mínimo"
-                      : cheio
-                      ? "Capacidade máxima"
-                      : "OK";
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-[9px]">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-2 py-1 text-left">Data</th>
+                    <th className="px-2 py-1 text-left">Dia</th>
+                    <th className="px-2 py-1 text-left">Título</th>
+                    <th className="px-2 py-1 text-center">Hora</th>
+                    <th className="px-2 py-1 text-center">Mín.</th>
+                    <th className="px-2 py-1 text-center">Máx.</th>
+                    <th className="px-2 py-1 text-center">Selecionados</th>
+                    <th className="px-2 py-1 text-center">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {extraRows
+                    .filter(applyStatusFilter)
+                    .map((e) => {
+                      const falta = e.current < e.min;
+                      const cheio = e.current >= e.max;
+                      const status = falta
+                        ? "Abaixo do mínimo"
+                        : cheio
+                        ? "Capacidade máxima"
+                        : "OK";
 
-                    const color = falta
-                      ? "text-red-600"
-                      : cheio
-                      ? "text-yellow-600"
-                      : "text-green-600";
+                      const color = falta
+                        ? "text-red-600"
+                        : cheio
+                        ? "text-yellow-600"
+                        : "text-green-600";
 
-                    return (
-                      <tr
-                        key={e.id}
-                        className="border-t border-gray-100 align-middle"
-                      >
-                        <td className="px-2 py-1">
-                          {e.date.split("-").reverse().join("/")}
-                        </td>
-                        <td className="px-2 py-1">{e.weekday}</td>
-                        <td className="px-2 py-1">{e.title}</td>
-                        <td className="px-2 py-1 text-center">{e.time}h</td>
-                        <td className="px-2 py-1 text-center">{e.min}</td>
-                        <td className="px-2 py-1 text-center">{e.max}</td>
-                        <td className="px-2 py-1 text-center">{e.current}</td>
-                        <td className={`px-2 py-1 text-center ${color}`}>
-                          {status}
-                        </td>
-                      </tr>
-                    );
-                  })}
-              </tbody>
-            </table>
+                      return (
+                        <tr
+                          key={e.id}
+                          className="border-t border-gray-100 align-middle"
+                        >
+                          <td className="px-2 py-1">
+                            {e.date.split("-").reverse().join("/")}
+                          </td>
+                          <td className="px-2 py-1">{e.weekday}</td>
+                          <td className="px-2 py-1">{e.title}</td>
+                          <td className="px-2 py-1 text-center">{e.time}h</td>
+                          <td className="px-2 py-1 text-center">{e.min}</td>
+                          <td className="px-2 py-1 text-center">{e.max}</td>
+                          <td className="px-2 py-1 text-center">{e.current}</td>
+                          <td className={`px-2 py-1 text-center ${color}`}>
+                            {status}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
           </div>
         </>
       )}

@@ -22,15 +22,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const init = async () => {
+      // 🔵 Restaura sessão persistida no navegador
       const {
         data: { session },
       } = await supabase.auth.getSession();
+
       setUser(session?.user ?? null);
       setLoading(false);
     };
 
     init();
 
+    // 🔵 Mantém usuário atualizado em qualquer mudança
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -43,6 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signIn = async (email: string, password: string) => {
+    // 🔵 Supabase já persistirá sessão automaticamente
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,

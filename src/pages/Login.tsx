@@ -79,6 +79,7 @@ export default function Login() {
     setLoading(true);
 
     try {
+      supabase.auth.setSession({ persistSession: rememberMe });
       const { error: signInError } = await signIn(
         email.trim(),
         password.trim()
