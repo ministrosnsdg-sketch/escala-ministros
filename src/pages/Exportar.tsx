@@ -1,10 +1,5 @@
 // src/pages/Exportar.tsx
-import React, {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Layout } from "../components/Layout";
 import { RequireAuth } from "../components/RequireAuth";
 import { useAuth } from "../context/AuthContext";
@@ -12,33 +7,17 @@ import { supabase } from "../lib/supabaseClient";
 
 /** Constantes */
 const MESES = [
-  "JANEIRO",
-  "FEVEREIRO",
-  "MARÇO",
-  "ABRIL",
-  "MAIO",
-  "JUNHO",
-  "JULHO",
-  "AGOSTO",
-  "SETEMBRO",
-  "OUTUBRO",
-  "NOVEMBRO",
-  "DEZEMBRO",
+  "JANEIRO", "FEVEREIRO", "MARÇO", "ABRIL", "MAIO", "JUNHO",
+  "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO",
 ];
 
 const DIAS_LONGO = [
-  "DOMINGO",
-  "SEGUNDA-FEIRA",
-  "TERÇA-FEIRA",
-  "QUARTA-FEIRA",
-  "QUINTA-FEIRA",
-  "SEXTA-FEIRA",
-  "SÁBADO",
+  "DOMINGO", "SEGUNDA-FEIRA", "TERÇA-FEIRA", "QUARTA-FEIRA",
+  "QUINTA-FEIRA", "SEXTA-FEIRA", "SÁBADO",
 ];
 
 // páginas individuais
 const FIXED_DEFAULT_TIMES = ["06:30", "11:30", "19:00"];
-// horários da página única
 const SUNDAY_SPECIAL_TIMES = ["08:30", "11:00"];
 
 /** Utils */
@@ -61,14 +40,16 @@ function isInRange(date: string, start: string, end: string) {
   return date >= start && date <= end;
 }
 
-/** Compactação de nomes para caber na linha */
+/** Compactação de nomes */
 function compactNames(nomes: string[]): string[] {
   const parts = nomes.map((raw) => {
-    const upper = (raw || "").toUpperCase().trim();
-    const tokens = upper.split(/\s+/).filter(Boolean);
-    const first = tokens[0] || "";
-    const last = tokens.length > 1 ? tokens[tokens.length - 1] : "";
-    return { original: upper, first, last };
+    const up = (raw || "").toUpperCase().trim();
+    const tokens = up.split(/\s+/).filter(Boolean);
+    return {
+      original: up,
+      first: tokens[0] || "",
+      last: tokens.length > 1 ? tokens[tokens.length - 1] : "",
+    };
   });
 
   const byFirst: Record<string, number[]> = {};
@@ -85,37 +66,33 @@ function compactNames(nomes: string[]): string[] {
       return;
     }
 
-    type Item = { idx: number; first: string; last: string; initial: string };
-    const items: Item[] = idxs.map((idx) => {
+    const items = idxs.map((idx) => {
       const p = parts[idx];
-      const initial = p.last ? p.last[0] : "";
-      return { idx, first: p.first, last: p.last, initial };
+      return {
+        idx,
+        first: p.first,
+        last: p.last,
+        initial: p.last ? p.last[0] : "",
+      };
     });
 
-    const byInitial: Record<string, Item[]> = {};
+    const byInitial: Record<string, any[]> = {};
     items.forEach((it) => {
-      const k = it.initial || "_";
-      (byInitial[k] ||= []).push(it);
+      (byInitial[it.initial || "_"] ||= []).push(it);
     });
 
     Object.values(byInitial).forEach((bucket) => {
       if (bucket.length === 1) {
         const it = bucket[0];
-        result[it.idx] = it.initial
-          ? `${it.first} ${it.initial}.`
-          : it.first;
+        result[it.idx] = it.initial ? `${it.first} ${it.initial}.` : it.first;
       } else {
         bucket.sort(
           (a, b) => (a.last || "").length - (b.last || "").length
         );
-        bucket.forEach((it, index) => {
-          if (!it.last) {
-            result[it.idx] = it.first;
-          } else if (index === 0) {
-            result[it.idx] = `${it.first} ${it.last}`;
-          } else {
-            result[it.idx] = `${it.first} ${it.initial}.`;
-          }
+        bucket.forEach((it, idx) => {
+          if (!it.last) result[it.idx] = it.first;
+          else if (idx === 0) result[it.idx] = `${it.first} ${it.last}`;
+          else result[it.idx] = `${it.first} ${it.initial}.`;
         });
       }
     });
@@ -126,23 +103,23 @@ function compactNames(nomes: string[]): string[] {
 
 /** Tipos */
 type EscalaEvento = {
-  date: string;        // YYYY-MM-DD
-  time: string;        // HH:MM
+  date: string;
+  time: string;
   isExtra: boolean;
   tituloExtra: string | null;
-  ministros: string[]; // nomes em caixa alta
+  ministros: string[];
 };
 
 type EventoCompleto = {
   date: string;
   time: string;
   dow: number;
-  labelDia: string;      // só o dia
-  labelDiaHora: string;  // extras: DIA - HH:MM
+  labelDia: string;
+  labelDiaHora: string;
   isExtra: boolean;
   tituloExtra: string | null;
   ministros: string[];
-  groupLabel?: string;   // cabeçalho de bloco
+  groupLabel?: string;
 };
 
 type PaginaConfig = {
@@ -155,7 +132,7 @@ type PaginaConfig = {
   match: (ev: EscalaEvento) => boolean;
 };
 
-/** Componente para mostrar os nomes na célula */
+/** Renderização dos nomes */
 function NamesRow({
   nomes,
   singleLine,
@@ -185,9 +162,9 @@ function NamesRow({
 
   if (!singleLine && compact.length > MAX) {
     const linhas: string[][] = [];
-    for (let i = 0; i < compact.length; i += MAX) {
+    for (let i = 0; i < compact.length; i += MAX)
       linhas.push(compact.slice(i, i + MAX));
-    }
+
     return (
       <div className="flex flex-col gap-0.5">
         {linhas.map((linha, i) => (
@@ -219,8 +196,11 @@ export default function ExportarPage() {
     </RequireAuth>
   );
 }
-
 function ExportarInner() {
+  const [blockedMapState, setBlockedMapState] = useState<
+    Map<string, { blocked_times: string[] | null; reason?: string }>
+  >(new Map());
+
   const { user } = useAuth();
 
   const hoje = new Date();
@@ -236,8 +216,11 @@ function ExportarInner() {
     {}
   );
 
-  // Horários de domingo (dinâmicos)
-  const [domingoTimes, setDomingoTimes] = useState<string[]>(["08:30", "11:00"]);  const [includeDomingosExtras, setIncludeDomingosExtras] = useState(true);
+  const [domingoTimes, setDomingoTimes] = useState<string[]>([
+    "08:30",
+    "11:00",
+  ]);
+  const [includeDomingosExtras, setIncludeDomingosExtras] = useState(true);
 
   const [isAdmin, setIsAdmin] = useState(false);
   const [loadingAdmin, setLoadingAdmin] = useState(true);
@@ -253,30 +236,24 @@ function ExportarInner() {
     .only-print { display: block !important; }
     .page { page-break-after: always; }
     .page:last-child { page-break-after: auto; }
-
-    /* Faz o navegador imprimir as cores */
     * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 
-    /* Bordas pretas em toda a tabela */
     table.table-black,
     .table-black th,
     .table-black td {
       border: 1px solid #000 !important;
     }
 
-    /* Zebra do corpo */
     .zebra thead tr { background: #000 !important; }
     .zebra thead th { color: #fff !important; }
     .zebra tbody tr:nth-child(odd)  { background: #ffffff !important; }
     .zebra tbody tr:nth-child(even) { background: #f0f0f0 !important; }
 
-    /* Barras/separadores de seção */
     .zebra .print-separator { background: #dcdcdc !important; }
   }
 
   @media screen {
     .only-print { display: none; }
-    /* também deixa as bordas pretas na tela */
     .table-black th, .table-black td { border-color: #000; }
     .zebra tbody tr:nth-child(even) { background: #f7f7f7; }
   }
@@ -309,7 +286,7 @@ function ExportarInner() {
     checkAdmin();
   }, [user]);
 
-  /** Carrega horários para montar checkboxes */
+  /** Carrega horários */
   useEffect(() => {
     (async () => {
       try {
@@ -332,27 +309,28 @@ function ExportarInner() {
             .map((h) => (h.time as string).slice(0, 5));
         }
 
-                // Detecta horários ativos de domingo (weekday === 0)
-        const domingosAtivos = Array.from(new Set(
-          (data as any[])
-            .filter((h) => h && h.weekday === 0 && (h.active === true || h.active == null))
-            .map((h) => String(h.time).slice(0,5))
-        )).sort((a,b) => a.localeCompare(b));
-        if (domingosAtivos.length) {
-          setDomingoTimes(domingosAtivos);
-        } else {
-          // fallback para padrão se não houver horários de domingo ativos na base
-          setDomingoTimes(["08:30","11:00"]); 
-        }
+        const domingosAtivos = Array.from(
+          new Set(
+            (data as any[])
+              .filter(
+                (h) =>
+                  h &&
+                  h.weekday === 0 &&
+                  (h.active === true || h.active == null)
+              )
+              .map((h) => String(h.time).slice(0, 5))
+          )
+        ).sort((a, b) => a.localeCompare(b));
+
+        if (domingosAtivos.length) setDomingoTimes(domingosAtivos);
+        else setDomingoTimes(["08:30", "11:00"]);
 
         const all = Array.from(
-          new Set([
-            ...FIXED_DEFAULT_TIMES,
-            ...ativos,
-          ])
+          new Set([...FIXED_DEFAULT_TIMES, ...ativos])
         ).sort((a, b) => a.localeCompare(b));
 
         setTimes(all);
+
         setIncludedTimes((prev) => {
           const next: Record<string, boolean> = {};
           all.forEach((t) => (next[t] = prev[t] ?? true));
@@ -364,12 +342,9 @@ function ExportarInner() {
     })();
   }, []);
 
-  /** Carrega escala quando muda mês/ano */
+  /** Carrega escala */
   useEffect(() => {
-    if (isAdmin && !loadingAdmin) {
-      void loadEscala();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (isAdmin && !loadingAdmin) loadEscala();
   }, [ano, mes0, isAdmin, loadingAdmin]);
 
   async function loadEscala() {
@@ -382,63 +357,85 @@ function ExportarInner() {
       mes0 + 1
     )}-${pad(new Date(ano, mes0 + 1, 0).getDate())}`;
 
+    /** BLOQUEIOS */
+    const { data: blockedData } = await supabase
+      .from("blocked_masses")
+      .select("date, blocked_times, reason")
+      .gte("date", inicio)
+      .lte("date", fim);
+
+    const tempBlocked = new Map<
+      string,
+      { blocked_times: string[] | null; reason?: string }
+    >();
+
+    (blockedData || []).forEach((b) => {
+      tempBlocked.set(b.date, {
+        blocked_times: b.blocked_times,
+        reason: b.reason,
+      });
+    });
+
+    setBlockedMapState(tempBlocked);
+
     try {
       /** HORÁRIOS */
       const { data: hData, error: hErr } = await supabase
         .from("horarios")
         .select("id, time");
+
       if (hErr && hErr.code !== "42P01") throw hErr;
+
       const horarioMap = new Map<number, string>();
       (hData || []).forEach((h: any) => {
         if (!h.id || !h.time) return;
-        horarioMap.set(h.id as number, String(h.time).slice(0, 5));
+        horarioMap.set(h.id, String(h.time).slice(0, 5));
       });
 
       /** MINISTROS */
       const { data: mData, error: mErr } = await supabase
         .from("ministers")
         .select("id, name, active");
+
       if (mErr && mErr.code !== "42P01") throw mErr;
+
       const nomesPorId: Record<string, string> = {};
       (mData || []).forEach((m: any) => {
         if (m.active === false) return;
         if (!m.id || !m.name) return;
-        nomesPorId[String(m.id)] = String(m.name)
-          .toUpperCase()
-          .trim();
+        nomesPorId[m.id] = String(m.name).toUpperCase().trim();
       });
 
-      /** EXTRAS DO MÊS */
+      /** EXTRAS */
       const extraInfoMap = new Map<
         number,
         { date: string; time: string; title: string | null }
       >();
+
       try {
         const { data, error } = await supabase
           .from("extras")
-          .select(
-            "id, event_date, time, title, active"
-          )
+          .select("id, event_date, time, title, active")
           .eq("active", true)
           .gte("event_date", inicio)
           .lte("event_date", fim)
           .order("event_date")
           .order("time");
+
         if (error && error.code !== "42P01") throw error;
+
         (data || []).forEach((e: any) => {
           if (!e.id || !e.event_date || !e.time) return;
-          extraInfoMap.set(e.id as number, {
-            date: e.event_date as string,
+          extraInfoMap.set(e.id, {
+            date: e.event_date,
             time: String(e.time).slice(0, 5),
-            title: e.title ? String(e.title) : null,
+            title: e.title || null,
           });
         });
-      } catch (e) {
-        console.warn("extras erro:", e);
-      }
+      } catch {}
       const extraIds = Array.from(extraInfoMap.keys());
 
-      /** ESCALA FINAL (escala_regular / escala_extras) */
+      /** ESCALA FINAL (regular + extras) */
       let escalaReg: any[] = [];
       try {
         const { data, error } = await supabase
@@ -446,11 +443,10 @@ function ExportarInner() {
           .select("date, horario_id, minister_id")
           .gte("date", inicio)
           .lte("date", fim);
+
         if (error && error.code !== "42P01") throw error;
         escalaReg = data || [];
-      } catch (e) {
-        console.warn("escala_regular erro:", e);
-      }
+      } catch {}
 
       let escalaExt: any[] = [];
       try {
@@ -459,49 +455,43 @@ function ExportarInner() {
             .from("escala_extras")
             .select("extra_id, minister_id")
             .in("extra_id", extraIds);
+
           if (error && error.code !== "42P01") throw error;
           escalaExt = data || [];
         }
-      } catch (e) {
-        console.warn("escala_extras erro:", e);
-      }
+      } catch {}
 
-      /** FALLBACK: monthly_availability_regular + availability_extras */
+      /** FALLBACK: availability */
       let avReg: any[] = [];
       let avExtras: any[] = [];
 
       const hasFinal =
-        (escalaReg && escalaReg.length > 0) ||
-        (escalaExt && escalaExt.length > 0);
+        (escalaReg?.length ?? 0) > 0 || (escalaExt?.length ?? 0) > 0;
 
       if (!hasFinal) {
         try {
-          const { data, error } = await supabase
+          const { data } = await supabase
             .from("monthly_availability_regular")
             .select("minister_id, date, horario_id")
             .gte("date", inicio)
             .lte("date", fim);
-          if (error && error.code !== "42P01") throw error;
+
           avReg = data || [];
-        } catch (e) {
-          console.warn("monthly_availability_regular erro:", e);
-        }
+        } catch {}
 
         try {
           if (extraIds.length) {
-            const { data, error } = await supabase
+            const { data } = await supabase
               .from("availability_extras")
               .select("minister_id, extra_id")
               .in("extra_id", extraIds);
-            if (error && error.code !== "42P01") throw error;
+
             avExtras = data || [];
           }
-        } catch (e) {
-          console.warn("availability_extras erro:", e);
-        }
+        } catch {}
       }
 
-      /** Montagem final de eventos */
+      /** Montagem do mapa final de eventos */
       const mapa: Record<string, EscalaEvento> = {};
 
       function addEvento(
@@ -513,10 +503,12 @@ function ExportarInner() {
       ) {
         if (!date || !time || !ministerId) return;
         if (!isInRange(date, inicio, fim)) return;
-        const nome = nomesPorId[String(ministerId)];
+
+        const nome = nomesPorId[ministerId];
         if (!nome) return;
 
         const key = `${date}|${time}|${isExtra ? tituloExtra || "" : ""}`;
+
         if (!mapa[key]) {
           mapa[key] = {
             date,
@@ -526,56 +518,37 @@ function ExportarInner() {
             ministros: [],
           };
         }
+
         if (!mapa[key].ministros.includes(nome)) {
           mapa[key].ministros.push(nome);
         }
       }
 
+      /** Processa escala final */
       if (hasFinal) {
-        // usa escala_regular
-        (escalaReg || []).forEach((r: any) => {
-          const date: string = r.date;
-          const time =
-            horarioMap.get(r.horario_id as number) || "";
-          if (date && time) {
-            addEvento(date, time, r.minister_id, false, null);
-          }
+        escalaReg.forEach((r: any) => {
+          const date = r.date;
+          const time = horarioMap.get(r.horario_id) || "";
+          if (date && time) addEvento(date, time, r.minister_id, false);
         });
 
-        // usa escala_extras
-        (escalaExt || []).forEach((r: any) => {
-          const info = extraInfoMap.get(r.extra_id as number);
+        escalaExt.forEach((r: any) => {
+          const info = extraInfoMap.get(r.extra_id);
           if (!info) return;
-          addEvento(
-            info.date,
-            info.time,
-            r.minister_id,
-            true,
-            info.title
-          );
+          addEvento(info.date, info.time, r.minister_id, true, info.title);
         });
       } else {
-        // fallback: monthly_availability_regular
-        (avReg || []).forEach((r: any) => {
-          const date: string = r.date;
-          const time =
-            horarioMap.get(r.horario_id as number) || "";
-          if (date && time) {
-            addEvento(date, time, r.minister_id, false, null);
-          }
+        avReg.forEach((r: any) => {
+          const date = r.date;
+          const time = horarioMap.get(r.horario_id) || "";
+          if (date && time)
+            addEvento(date, time, r.minister_id, false);
         });
 
-        // fallback extras
-        (avExtras || []).forEach((r: any) => {
-          const info = extraInfoMap.get(r.extra_id as number);
+        avExtras.forEach((r: any) => {
+          const info = extraInfoMap.get(r.extra_id);
           if (!info) return;
-          addEvento(
-            info.date,
-            info.time,
-            r.minister_id,
-            true,
-            info.title
-          );
+          addEvento(info.date, info.time, r.minister_id, true, info.title);
         });
       }
 
@@ -599,6 +572,7 @@ function ExportarInner() {
     }
   }
 
+  /** Selecionar / Limpar */
   function selecionarTodos() {
     const next: Record<string, boolean> = {};
     times.forEach((t) => (next[t] = true));
@@ -620,15 +594,18 @@ function ExportarInner() {
 
   /** Configuração das páginas */
   const paginas: PaginaConfig[] = [
-    ...times
-      .map((t) => ({
-        key: `time-${t}`,
-        label: `MISSAS — ${t}`,
-        include: includedTimes[t],
-        singleLine: true,
-        times: [t],
-        match: (ev: EscalaEvento) => !ev.isExtra && ev.time === t && new Date(ev.date + "T00:00:00").getDay() !== 0,
-      })),
+    ...times.map((t) => ({
+      key: `time-${t}`,
+      label: `MISSAS — ${t}`,
+      include: includedTimes[t],
+      singleLine: true,
+      times: [t],
+      match: (ev: EscalaEvento) => {
+        const dow = new Date(ev.date + "T00:00:00").getDay();
+        return !ev.isExtra && ev.time === t && dow !== 0;
+      },
+    })),
+
     {
       key: "domingos-extras",
       label: `Página ÚNICA: Domingos ${domingoTimes.join(", ")} e Missas Extras`,
@@ -644,23 +621,19 @@ function ExportarInner() {
     },
   ];
 
-  /** Gera linhas para cada página */
+  /** Gerar registros */
   function gerarRegistrosCompletos(pg: PaginaConfig): EventoCompleto[] {
     const eventosNaPagina = eventos.filter((ev) => pg.match(ev));
+
     const mapa = new Map<string, EscalaEvento>();
     eventosNaPagina.forEach((ev) => {
-      const key = `${ev.date}|${ev.time}|${ev.tituloExtra || ""}`;
-      mapa.set(key, ev);
+      mapa.set(`${ev.date}|${ev.time}|${ev.tituloExtra || ""}`, ev);
     });
 
     if (pg.isCombined) {
-      const block0830: EventoCompleto[] = [];
-      const block1100: EventoCompleto[] = [];
-      const blockExtras: EventoCompleto[] = [];
-
-      // domingos (dinâmicos)
       const blocksPorHora: Record<string, EventoCompleto[]> = {};
       domingoTimes.forEach((t) => (blocksPorHora[t] = []));
+
       dias.forEach((date) => {
         const dow = new Date(date + "T00:00:00").getDay();
         if (dow !== 0) return;
@@ -668,7 +641,8 @@ function ExportarInner() {
           const key = `${date}|${t}|`;
           const ev = mapa.get(key);
           if (!ev || !ev.ministros.length) return;
-          const item: EventoCompleto = {
+
+          blocksPorHora[t].push({
             date,
             time: t,
             dow,
@@ -677,57 +651,56 @@ function ExportarInner() {
             isExtra: false,
             tituloExtra: null,
             ministros: ev.ministros,
-          };
-          blocksPorHora[t].push(item);
+          });
         });
       });
-      // missas extras
-      const extras = eventosNaPagina
+
+      const extras: EventoCompleto[] = eventosNaPagina
         .filter((ev) => ev.isExtra && ev.ministros.length)
         .sort((a, b) =>
           a.date === b.date
             ? a.time.localeCompare(b.time)
             : a.date.localeCompare(b.date)
-        );
-
-      extras.forEach((ev) => {
-        const dow = new Date(ev.date + "T00:00:00").getDay();
-        blockExtras.push({
+        )
+        .map((ev) => ({
           date: ev.date,
           time: ev.time,
-          dow,
-          labelDia: DIAS_LONGO[dow],
-          labelDiaHora: `${DIAS_LONGO[dow]} - ${ev.time}`,
+          dow: new Date(ev.date + "T00:00:00").getDay(),
+          labelDia: DIAS_LONGO[new Date(ev.date + "T00:00:00").getDay()],
+          labelDiaHora: `${DIAS_LONGO[new Date(ev.date + "T00:00:00").getDay()]} - ${ev.time}`,
           isExtra: true,
           tituloExtra: ev.tituloExtra,
           ministros: ev.ministros,
-        });
-      });
+        }));
 
       const final: EventoCompleto[] = [];
+
       domingoTimes.forEach((t) => {
         const blk = blocksPorHora[t];
-        if (blk && blk.length) {
+        if (blk.length) {
           blk[0].groupLabel = `DOMINGOS — ${t}`;
           final.push(...blk);
         }
       });
-      if (blockExtras.length) {
-        blockExtras[0].groupLabel = "MISSAS EXTRAS";
-        final.push(...blockExtras);
+
+      if (extras.length) {
+        extras[0].groupLabel = "MISSAS EXTRAS";
+        final.push(...extras);
       }
+
       return final;
     }
 
-    // páginas individuais
+    const out: EventoCompleto[] = [];
+
     const t = pg.times[0];
     if (!t) return [];
 
-    const out: EventoCompleto[] = [];
     dias.forEach((date) => {
       const key = `${date}|${t}|`;
       const ev = mapa.get(key);
       if (!ev || !ev.ministros.length) return;
+
       const dow = new Date(date + "T00:00:00").getDay();
       out.push({
         date,
@@ -774,7 +747,7 @@ function ExportarInner() {
     <div className="max-w-5xl mx-auto">
       <style>{printCss}</style>
 
-      {/* Controles (não imprime) */}
+      {/* Controles */}
       <div className="no-print flex flex-wrap items-center justify-between gap-3 mb-4">
         <div className="flex gap-2">
           <select
@@ -788,6 +761,7 @@ function ExportarInner() {
               </option>
             ))}
           </select>
+
           <select
             value={ano}
             onChange={(e) => setAno(parseInt(e.target.value, 10))}
@@ -810,33 +784,28 @@ function ExportarInner() {
         </button>
       </div>
 
-      {/* Filtros (não imprime) */}
+      {/* Filtros */}
       <div className="no-print bg-white border rounded-2xl p-4 mb-4 space-y-3">
         <div className="text-sm font-semibold">
           Selecionar quais páginas de escala serão incluídas na impressão
         </div>
 
         <div className="space-y-1">
-          {times
-            
-            .map((t) => (
-              <label
-                key={t}
-                className="flex items-center gap-2 text-xs"
-              >
-                <input
-                  type="checkbox"
-                  checked={includedTimes[t] ?? false}
-                  onChange={(e) =>
-                    setIncludedTimes((prev) => ({
-                      ...prev,
-                      [t]: e.target.checked,
-                    }))
-                  }
-                />
-                <span>Página: Missas — {t}</span>
-              </label>
-            ))}
+          {times.map((t) => (
+            <label key={t} className="flex items-center gap-2 text-xs">
+              <input
+                type="checkbox"
+                checked={includedTimes[t] ?? false}
+                onChange={(e) =>
+                  setIncludedTimes((prev) => ({
+                    ...prev,
+                    [t]: e.target.checked,
+                  }))
+                }
+              />
+              <span>Página: Missas — {t}</span>
+            </label>
+          ))}
 
           <label className="flex items-center gap-2 text-xs mt-2">
             <input
@@ -844,9 +813,7 @@ function ExportarInner() {
               checked={includeDomingosExtras}
               onChange={(e) => setIncludeDomingosExtras(e.target.checked)}
             />
-            <span>
-              Página ÚNICA: Domingos 08:30, 11:00 e Missas Extras
-            </span>
+            <span>Página ÚNICA: Domingos {domingoTimes.join(", ")} e Missas Extras</span>
           </label>
         </div>
 
@@ -870,22 +837,19 @@ function ExportarInner() {
             {erro}
           </div>
         )}
+
         {carregando && (
           <div className="text-[11px] text-gray-600">
             Carregando escala para {labelMesAno}...
           </div>
         )}
-        {!carregando && eventos.length === 0 && !erro && (
-          <div className="text-[11px] text-gray-600">
-            Nenhum registro de escala encontrado para {labelMesAno}.
-          </div>
-        )}
       </div>
 
-      {/* Layout de impressão */}
+      {/* IMPRESSÃO */}
       <div className="only-print">
         {paginas.map((pg) => {
           if (!pg.include) return null;
+
           const registros = gerarRegistrosCompletos(pg);
           if (!registros.length) return null;
 
@@ -894,9 +858,11 @@ function ExportarInner() {
               <div className="px-4 pt-2 text-right text-[9px] text-gray-500">
                 Escala de Ministros
               </div>
+
               <div className="px-4 text-center font-black text-[12px]">
                 ESCALA DE MINISTROS EXTRAORDINÁRIOS DA DISTRIBUIÇÃO DA EUCARISTIA
               </div>
+
               <div className="px-4 pb-2 text-center font-semibold text-[10px]">
                 {labelMesAno} — {pg.label}
               </div>
@@ -904,25 +870,33 @@ function ExportarInner() {
               <table className="w-full table-black zebra text-[9px] border-collapse">
                 <thead>
                   <tr className="bg-gray-100">
-                    <th className="p-1.5 border text-left w-[60px]">
-                      DATA
-                    </th>
-                    <th className="p-1.5 border text-left w-[80px]">
-                      DIA / SEMANA
-                    </th>
-                    <th className="p-1.5 border text-left">
-                      MINISTROS
-                    </th>
+                    <th className="p-1.5 border text-left w-[60px]">DATA</th>
+                    <th className="p-1.5 border text-left w-[80px]">DIA / SEMANA</th>
+                    <th className="p-1.5 border text-left">MINISTROS</th>
                   </tr>
                 </thead>
+
                 <tbody>
                   {registros.map((ev, i) => {
                     const nomesOrdenados = [...ev.ministros].sort((a, b) =>
                       a.localeCompare(b, "pt-BR")
                     );
+
                     const labelDiaSemana = ev.isExtra
                       ? ev.labelDiaHora
                       : ev.labelDia;
+
+                    const block = blockedMapState.get(ev.date);
+
+                    const isDayBlocked =
+                      block && block.blocked_times === null;
+
+                    const isTimeBlocked =
+                      block &&
+                      Array.isArray(block.blocked_times) &&
+                      block.blocked_times.some(
+                        (t) => t.slice(0, 5) === ev.time.slice(0, 5)
+                      );
 
                     return (
                       <React.Fragment
@@ -938,27 +912,34 @@ function ExportarInner() {
                             </td>
                           </tr>
                         )}
-                        <tr
-                          className={
-                            i % 2 === 0 ? "bg-gray-50" : "bg-white"
-                          }
-                        >
+
+                        <tr className={i % 2 === 0 ? "bg-gray-50" : "bg-white"}>
                           <td className="p-1.5 border whitespace-nowrap font-bold">
                             {formatDateBR(ev.date)}
                           </td>
+
                           <td className="p-1.5 border whitespace-nowrap font-bold">
                             {labelDiaSemana}
+
                             {ev.isExtra && ev.tituloExtra && (
                               <div className="text-[8px] text-gray-600 font-normal">
                                 {ev.tituloExtra}
                               </div>
                             )}
                           </td>
+
+                          {/* COLUNA MINISTROS OU AVISO DE BLOQUEIO */}
                           <td className="p-1.5 border">
-                            <NamesRow
-                              nomes={nomesOrdenados}
-                              singleLine={pg.singleLine}
-                            />
+                            {isDayBlocked || isTimeBlocked ? (
+                              <div className="text-red-700 font-bold text-[10px] leading-tight">
+                                NÃO HAVERÁ MISSA
+                                <div className="text-[9px] text-red-600 font-normal">
+                                  Motivo: {block?.reason || "Não especificado"}
+                                </div>
+                              </div>
+                            ) : (
+                              <NamesRow nomes={nomesOrdenados} singleLine={pg.singleLine} />
+                            )}
                           </td>
                         </tr>
                       </React.Fragment>
@@ -973,8 +954,7 @@ function ExportarInner() {
         {nenhumaPaginaVisivel && (
           <div className="page">
             <div className="px-4 py-3 text-center text-xs">
-              Nenhuma página disponível para impressão com os filtros
-              selecionados.
+              Nenhuma página disponível para impressão com os filtros selecionados.
             </div>
           </div>
         )}

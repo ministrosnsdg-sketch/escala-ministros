@@ -39,6 +39,13 @@ type DayAssignment = {
   ministerName: string;
 };
 
+// NOVO TIPO PARA BLOQUEIOS
+type BlockedMasses = {
+  date: string;
+  blocked_times: string[] | null;
+  reason?: string;
+};
+
 export default function EscalaPage() {
   return (
     <RequireAuth>
@@ -87,6 +94,10 @@ function EscalaInner() {
   const [useAvailabilityFallback, setUseAvailabilityFallback] = useState(false);
 
   const [showMyAssignments, setShowMyAssignments] = useState(true);
+  
+  // NOVOS ESTADOS PARA BLOQUEIOS
+  const [blockedDates, setBlockedDates] = useState<Set<string>>(new Set());
+  const [blockedMasses, setBlockedMasses] = useState<BlockedMasses[]>([]);
 
   // Buscar ministro do usuário logado
   useEffect(() => {
@@ -133,6 +144,8 @@ function EscalaInner() {
       setHorarioMap(hMap);
 
       // MINISTROS
+      // ✅ Nota sobre o Ghost User: A solução para o Marcos Junior deve ser feita no banco de dados, 
+      // garantindo que ele não esteja mais em 'ministers' ou em nenhuma tabela de escala/disponibilidade.
       const { data: mData } = await supabase
         .from("ministers")
         .select("id, name");
@@ -167,6 +180,31 @@ function EscalaInner() {
       });
       setExtraInfoById(extraMap);
       setExtrasDates(extraDateSet);
+
+      // NOVO: BLOQUEIOS
+      const { data: blocksData } = await supabase
+        .from("blocked_masses")
+        .select("date, blocked_times, reason")
+        .gte("date", start)
+        .lte("date", end);
+
+      const blocks = (blocksData || []).map((b: any) => ({
+  ...b,
+  blocked_times: Array.isArray(b.blocked_times)
+    ? b.blocked_times
+    : [],
+}));
+
+setBlockedMasses(blocks);
+
+      const blockedDatesSet = new Set<string>();
+      blocks.forEach(b => {
+        // A data está bloqueada se: blocked_times for NULL (dia todo bloqueado) OU blocked_times for um array não vazio
+        if (!b.blocked_times || b.blocked_times.length > 0) {
+          blockedDatesSet.add(b.date);
+        }
+      });
+      setBlockedDates(blockedDatesSet);
 
       // MISSAS FINAIS (regular + extras)
       let regRows: any[] = [];
@@ -346,8 +384,7 @@ function EscalaInner() {
             const ids = dayExtras.map((e: any) => e.id);
             const { data: exScale } = await supabase
               .from("escala_extras")
-              .select("extra_id, minister_id")
-              .in("extra_id", ids);
+              .select("extra_id, minister_id");
 
             (exScale || []).forEach((r: any) => {
               const info = dayExtras.find((e: any) => e.id === r.extra_id);
@@ -366,7 +403,7 @@ function EscalaInner() {
           }
         } catch {}
       } else {
-        // FALLBACK
+        // FALLBACK (Disponibilidade)
         try {
           const { data: avData } = await supabase
             .from("monthly_availability_regular")
@@ -429,36 +466,54 @@ function EscalaInner() {
   return (
     <div className="max-w-5xl mx-auto space-y-4">
       {/* Cabeçalho / legenda */}
-      <div className="flex gap-2 items-center text-[10px]">
-  {/* Seletor de Mês — igual ao da Disponibilidade */}
-  <select
-    className="border rounded px-2 py-1 text-[10px]"
-    value={month}
-    onChange={(e) => setMonth(Number(e.target.value))}
-  >
-    {MONTH_NAMES.map((name, idx) => (
-      <option key={idx} value={idx}>
-        {name.charAt(0).toUpperCase() + name.slice(1).toLowerCase()}
-      </option>
-    ))}
-  </select>
+      <div className="flex flex-wrap gap-2 items-end justify-between">
+        <div>
+          <h2 className="text-lg font-semibold text-[#4A6FA5]">Escala</h2>
+          <p className="text-[10px] text-gray-700">
+            Visualização do seu agendamento mensal.
+            <span className="inline-flex items-center gap-1 ml-2 mr-3">
+              <span className="w-2 h-2 rounded-full bg-green-600 inline-block" />
+              <span>
+                {useAvailabilityFallback
+                  ? "Você está disponível"
+                  : "Você está escalado"}
+              </span>
+            </span>
+            <span className="inline-flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full bg-purple-600 inline-block" />
+              <span>Há missas extras no dia</span>
+            </span>
+            {/* LEGENDA BLOQUEIO */}
+            <span className="inline-flex items-center gap-1 ml-3">
+              <span className="w-2 h-2 rounded-full bg-red-600 inline-block" />
+              <span>Horário/Dia bloqueado</span>
+            </span>
+          </p>
+        </div>
 
-  {/* Seletor de Ano — igual ao da Disponibilidade */}
-  <select
-    className="border rounded px-2 py-1 text-[10px] w-20"
-    value={year}
-    onChange={(e) => setYear(Number(e.target.value))}
-  >
-    {Array.from({ length: 10 }).map((_, i) => {
-      const y = new Date().getFullYear() - 2 + i;
-      return (
-        <option key={y} value={y}>
-          {y}
-        </option>
-      );
-    })}
-  </select>
-</div>
+        <div className="flex gap-2 items-center text-[10px]">
+          <select
+            className="border rounded px-2 py-1"
+            value={month}
+            onChange={(e) => setMonth(Number(e.target.value))}
+          >
+            {MONTH_NAMES.map((m, i) => (
+              <option key={i} value={i}>
+                {m}
+              </option>
+            ))}
+          </select>
+          <input
+            type="number"
+            className="border rounded px-2 py-1 w-20"
+            value={year}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              if (v > 1900) setYear(v);
+            }}
+          />
+        </div>
+      </div>
 
       {/* Calendário */}
       <div className="bg-white border border-gray-200 rounded-xl p-3">
@@ -484,20 +539,23 @@ function EscalaInner() {
             const isAssigned = assignedDates.has(c.date);
             const hasExtras = extrasDates.has(c.date);
             const isToday = c.date === todayIso;
+            
+            // NOVO: BLOQUEIO
+            const isBlocked = blockedDates.has(c.date);
 
             const base =
-  "h-10 rounded border transition relative cursor-pointer";
+              "h-10 rounded border transition relative cursor-pointer";
 
-const todayClass = isToday
-  ? "border-green-600 border-2 bg-green-100"
-  : "bg-white hover:bg-gray-50";
+            const todayClass = isToday
+              ? "border-green-600 border-2 bg-green-100"
+              : "bg-white hover:bg-gray-50";
 
             return (
               <div
-  key={idx}
-  className={`${base} ${todayClass}`}
-  onClick={() => handleDayClick(c.date)}
->
+                key={idx}
+                className={`${base} ${todayClass} ${isBlocked ? 'opacity-70' : ''}`} // Adiciona opacidade se bloqueado
+                onClick={() => handleDayClick(c.date)}
+              >
                 <div className="absolute top-1 left-1 text-[11px] font-semibold text-gray-700">
                   {c.day}
                 </div>
@@ -507,6 +565,10 @@ const todayClass = isToday
                   )}
                   {hasExtras && (
                     <span className="w-2 h-2 rounded-full bg-purple-600" />
+                  )}
+                  {/* ÍCONE DE BLOQUEIO */}
+                  {isBlocked && (
+                    <span className="w-2 h-2 rounded-full bg-red-600" />
                   )}
                 </div>
               </div>
@@ -576,8 +638,8 @@ const todayClass = isToday
                           {a.date.split("-").reverse().join("/")}
                         </td>
                         <td className={strongCell + " text-center"}>
-{a.time && a.time.length >= 5 ? a.time.slice(0, 5) + "h" : "—"}
-</td>
+                          {(a.time || "").slice(0, 5)}h
+                        </td>
                         <td className={normalCell}>
                           {a.title ||
                             (a.kind === "Fixa"
@@ -598,8 +660,17 @@ const todayClass = isToday
 
       {/* Modal: detalhes do dia */}
       {selectedDate && (
-        <div className="fixed inset-0 bg-black/30 flex items-start justify-center z-50">
-          <div className="mt-24 w-full max-w-md bg-white rounded-xl shadow-lg border border-gray-200 p-3">
+        <div 
+          className="fixed inset-0 bg-black/30 flex items-start justify-center z-50 p-4" 
+          onClick={() => {
+            setSelectedDate(null);
+            setDayAssignments([]);
+          }}
+        >
+          <div 
+            className="mt-24 w-full max-w-md bg-white rounded-xl shadow-lg border border-gray-200 p-3"
+            onClick={(e) => e.stopPropagation()} // Impede o fechamento ao clicar dentro
+          >
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-semibold text-[#4A6FA5]">
                 Escala do dia{" "}
@@ -620,16 +691,68 @@ const todayClass = isToday
               <div className="text-[10px] text-gray-600">
                 Carregando informações...
               </div>
-            ) : dayAssignments.length === 0 ? (
-              <div className="text-[10px] text-gray-600">
-                {useAvailabilityFallback
-                  ? "Nenhum ministro disponível para este dia."
-                  : "Nenhum ministro escalado para este dia."}
-              </div>
             ) : (
               (() => {
+                const dayBlock = blockedMasses.find(b => b.date === selectedDate);
+                const isBlockedDay = dayBlock && !dayBlock.blocked_times; // Bloqueio do dia inteiro
+
+                if (isBlockedDay) {
+                  return (
+                    <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-3 text-[10px]">
+                      <p className="font-semibold">O dia todo está bloqueado.</p>
+                      <p>Motivo: {dayBlock.reason || 'Não especificado.'}</p>
+                    </div>
+                  );
+                }
+
+                // 🟥 CORREÇÃO: FILTRAGEM DE HORÁRIOS BLOQUEADOS NO MODO DISPONIBILIDADE (Fallback)
+                let filteredAssignments = dayAssignments;
+
+                if (useAvailabilityFallback && dayBlock && dayBlock.blocked_times && dayBlock.blocked_times.length > 0) {
+                  filteredAssignments = dayAssignments.filter(assignment => {
+                    const assignmentTimeHHMM = assignment.time.slice(0, 5);
+                    
+                    // Verifica se o horário da missa (HH:MM) está na lista de bloqueados (HH:MM)
+                    const isBlocked = dayBlock.blocked_times!.some(blockedTime => 
+                        blockedTime.slice(0, 5) === assignmentTimeHHMM
+                    );
+                    return !isBlocked; // Remove se estiver bloqueado
+                  });
+                }
+                // 🟥 FIM DA CORREÇÃO DE FILTRAGEM
+
+                // Se não há mais atribuições após a filtragem (ou se a lista original era vazia)
+                if (filteredAssignments.length === 0) {
+                  return (
+                    <div className="text-[10px] text-gray-600">
+                        {useAvailabilityFallback 
+                            ? "Nenhum horário disponível para marcação neste dia (pode ter sido bloqueado)."
+                            : "Nenhum ministro escalado para este dia."
+                        }
+                    </div>
+                  );
+                }
+                // SE EXISTE DIA BLOQUEADO OU HORÁRIO BLOQUEADO → CRIAR ENTRADA FAKE
+if (dayBlock && dayBlock.blocked_times && dayBlock.blocked_times.length > 0) {
+  
+  dayBlock.blocked_times.forEach((hhmm) => {
+    const exists = filteredAssignments.some(a => a.time.slice(0,5) === hhmm.slice(0,5));
+
+    if (!exists) {
+      filteredAssignments.push({
+        date: selectedDate,
+        time: hhmm,
+        type: useAvailabilityFallback ? "Disponibilidade" : "Fixa",
+        title: undefined,
+        ministerName: "" // vazio = nenhum ministro
+      });
+    }
+  });
+}
+
+                // Agrupamento usando a lista FILTRADA
                 const grouped: Record<string, DayAssignment[]> =
-                  dayAssignments.reduce(
+                  filteredAssignments.reduce(
                     (acc: Record<
                       string,
                       DayAssignment[]
@@ -647,36 +770,77 @@ const todayClass = isToday
                 return (
                   <div className="space-y-3 max-h-80 overflow-y-auto">
                     {times.map((time) => {
-                      const entries = grouped[time];
-                      return (
-                        <div
-                          key={time}
-                          className="border-b last:border-b-0 pb-2"
-                        >
-                          <div className="text-xs font-semibold text-gray-800">
-                            {entries[0].title ? (
-                              <>
-                                {time.slice(0, 5)}h –{" "}
-                                <span className="text-purple-600 font-semibold">
-                                  {entries[0].title}
-                                </span>
-                              </>
-                            ) : (
-                              `${time.slice(0, 5)}h`
-                            )}
-                          </div>
+  const entries = grouped[time];
+  
+  // converte "19:00" ou "19:00:00" para "19:00"
+  const normalize = (t: string) => t.slice(0,5);
 
-                          <div className="mt-1 text-[11px] text-[#4A6FA5] leading-snug">
-                            {entries.map((entry, idx) => (
-                              <span key={idx}>
-                                {idx > 0 && " - "}
-                                {entry.ministerName}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })}
+  const assignmentTime = normalize(time);
+
+  const isBlockedTime =
+    dayBlock &&
+    Array.isArray(dayBlock.blocked_times) &&
+    dayBlock.blocked_times.some((bt) => normalize(bt) === assignmentTime);
+
+  const reason = dayBlock?.reason;
+
+  // ============================
+  //  💥 SE ESTÁ BLOQUEADO → MOSTRA
+  // ============================
+  if (isBlockedTime) {
+    return (
+      <div
+        key={time}
+        className="border rounded-md p-2 mb-2 bg-red-50 border-red-300"
+      >
+        {/* hora */}
+        <div className="text-xs font-semibold text-gray-800">
+          {assignmentTime}h
+        </div>
+
+        {/* padrão visual da Disponibilidade */}
+        <div className="mt-1">
+          <div className="text-[11px] text-red-700 font-bold">
+            NÃO HAVERÁ MISSA
+          </div>
+          <div className="text-[10px] text-red-600">
+            Motivo: {reason || "Não especificado"}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ============================
+  //  MODO NORMAL
+  // ============================
+  return (
+    <div key={time} className="border-b last:border-b-0 pb-2">
+      <div className="text-xs font-semibold text-gray-800">
+        {entries[0].title ? (
+          <>
+            {assignmentTime}h –{" "}
+            <span className="text-purple-600 font-semibold">
+              {entries[0].title}
+            </span>
+          </>
+        ) : (
+          `${assignmentTime}h`
+        )}
+      </div>
+
+      <div className="mt-1 text-[11px] text-[#4A6FA5] leading-snug">
+        {entries.map((entry, idx) => (
+          <span key={idx}>
+            {idx > 0 && " - "}
+            {entry.ministerName}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+})}
+
                   </div>
                 );
               })()

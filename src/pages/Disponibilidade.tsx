@@ -48,6 +48,13 @@ type Extra = {
   active: boolean;
 };
 
+type BlockedMass = {
+  id: number;
+  date: string;
+  blocked_times: string[] | null;
+  reason: string | null;
+};
+
 type MonthlyAvailabilityRow = {
   minister_id: string;
   date: string;
@@ -123,6 +130,9 @@ function DisponibilidadeInner() {
 
   const [slotCounts, setSlotCounts] = useState<Record<string, number>>({});
   const [extraCounts, setExtraCounts] = useState<Record<number, number>>({});
+
+  const [blockedMasses, setBlockedMasses] = useState<BlockedMass[]>([]);
+  const [blockedDates, setBlockedDates] = useState<Set<string>>(new Set());
 
   const [settingsDaysBefore, setSettingsDaysBefore] = useState<number>(10);
   const [overrides, setOverrides] = useState<AvailabilityOverride[]>([]);
@@ -448,7 +458,26 @@ function DisponibilidadeInner() {
         .eq("minister_id", selectedMinisterId)
         .gte("date", start)
         .lte("date", end);
+// Carregar bloqueios do mês
+const { data: blocksData } = await supabase
+  .from("blocked_masses")
+  .select("*")
+  .gte("date", start)
+  .lte("date", end);
 
+const blocks = (blocksData || []) as BlockedMass[];
+setBlockedMasses(blocks);
+
+const blockedDatesSet = new Set<string>();
+blocks.forEach(b => {
+  // A data está bloqueada se:
+  // 1. blocked_times for NULL (dia todo bloqueado)
+  // 2. OU blocked_times for um array não vazio (horários específicos bloqueados)
+  if (!b.blocked_times || b.blocked_times.length > 0) {
+    blockedDatesSet.add(b.date);
+  }
+});
+setBlockedDates(blockedDatesSet);
       if (avErr) {
         console.error(avErr);
         setError("Não foi possível carregar sua disponibilidade.");
@@ -565,6 +594,15 @@ function DisponibilidadeInner() {
 
   const toggleDraftMonthly = (date: string, horarioId: number) => {
     if (!canEditSelectedMonth || savingAll) return;
+    // NOVA VERIFICAÇÃO DE BLOQUEIO
+  const blocked = blockedMasses.find(b => b.date === date);
+  if (blocked && blocked.blocked_times) {
+    const horario = horarios.find(h => h.id === horarioId);
+    if (horario && blocked.blocked_times.includes(horario.time)) {
+      setError(`Este horário está bloqueado. Motivo: ${blocked.reason || 'Sem motivo especificado'}`);
+      return;
+    }
+  }
     const key = `${date}|${horarioId}`;
     const next = new Set(monthlyDraft);
     if (next.has(key)) next.delete(key);
@@ -574,6 +612,16 @@ function DisponibilidadeInner() {
 
   const toggleDraftExtra = (extraId: number) => {
     if (!canEditSelectedMonth || savingAll) return;
+
+    // NOVA VERIFICAÇÃO DE BLOQUEIO
+  const extra = extras.find(e => e.id === extraId);
+  if (extra) {
+    const blocked = blockedMasses.find(b => b.date === extra.event_date);
+    if (blocked && blocked.blocked_times && blocked.blocked_times.includes(extra.time)) {
+      setError(`Este horário está bloqueado. Motivo: ${blocked.reason || 'Sem motivo especificado'}`);
+      return;
+    }
+  }
     const next = new Set(extrasDraft);
     if (next.has(extraId)) next.delete(extraId);
     else next.add(extraId);
@@ -1208,13 +1256,16 @@ function DisponibilidadeInner() {
                 >
                   <span>{cell.day}</span>
                   <div className="mt-[1px] flex gap-[2px]">
-                    {hasSelection && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#16A34A]" />
-                    )}
-                    {hasExtras && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-purple-600" />
-                    )}
-                  </div>
+  {hasSelection && (
+    <span className="w-1.5 h-1.5 rounded-full bg-[#16A34A]" />
+  )}
+  {hasExtras && (
+    <span className="w-1.5 h-1.5 rounded-full bg-purple-600" />
+  )}
+  {blockedDates.has(date) && (
+    <span className="w-1.5 h-1.5 rounded-full bg-red-600" />
+  )}
+</div>
                 </button>
               );
             })
@@ -1226,10 +1277,14 @@ function DisponibilidadeInner() {
           <div className="flex items-center gap-1">
             <span className="w-2 h-2 rounded-full bg-[#16A34A]" />
             <span>Dia com horários marcados</span>
-          </div>
+          </div> 
           <div className="flex items-center gap-1">
             <span className="w-2 h-2 rounded-full bg-purple-600" />
             <span>Dia com missa extra</span>
+            <div className="flex items-center gap-1">
+  <span className="w-2 h-2 rounded-full bg-red-600" />
+  <span>Dia com horários bloqueados</span>
+</div>
           </div>
         </div>
       </div>
@@ -1270,42 +1325,47 @@ function DisponibilidadeInner() {
 
     <div className="space-y-2">
       {dayHorarios.map((h) => {
-        const extraSameTime = dayExtras.some(
-          (e) => e.time === h.time
-        );
+  const extraSameTime = dayExtras.some(
+    (e) => e.time === h.time
+  );
 
-        if (extraSameTime) {
-          return null;
-        }
+  if (extraSameTime) {
+    return null;
+  }
 
-        const key = `${selectedDate}|${h.id}`;
-        const checked = monthlyDraft.has(key);
-        const count = slotCounts[key] || 0;
+  const key = `${selectedDate}|${h.id}`;
+  const checked = monthlyDraft.has(key);
+  const count = slotCounts[key] || 0;
+  
+  // VERIFICAR SE ESTÁ BLOQUEADO
+  const blocked = blockedMasses.find(b => b.date === selectedDate);
+  const isBlocked = blocked && blocked.blocked_times && blocked.blocked_times.includes(h.time);
 
-        return (
-          <div
-            key={h.id}
-            className="flex items-center justify-between border rounded-lg px-3 py-2 bg-gray-50"
-          >
-            <div>
-              <div className="text-[11px] font-semibold">
-                {h.time.slice(0, 5)}h
-              </div>
-              <div className="text-[9px] text-gray-600">
-                Min {h.min_required} • Máx {h.max_allowed} • Atual {count}
-              </div>
-            </div>
+  return (
+    <div
+      key={h.id}
+      className={`flex items-center justify-between border rounded-lg px-3 py-2 ${isBlocked ? 'bg-red-50 border-red-300 opacity-60' : 'bg-gray-50'}`}
+    >
+      <div>
+        <div className="text-[11px] font-semibold">
+          {h.time.slice(0, 5)}h
+          {isBlocked && <span className="ml-2 text-red-600 text-[9px]">NÃO HAVERÁ MISSA</span>}
+        </div>
+        <div className="text-[9px] text-gray-600">
+          {isBlocked ? `Motivo: ${blocked.reason || 'Não especificado'}` : `Min ${h.min_required} • Máx ${h.max_allowed} • Atual ${count}`}
+        </div>
+      </div>
 
-            <input
-              type="checkbox"
-              className="w-4 h-4"
-              checked={checked}
-              onChange={() => toggleDraftMonthly(selectedDate, h.id)}
-              disabled={!canEditSelectedMonth}
-            />
-          </div>
-        );
-      })}
+      <input
+        type="checkbox"
+        className="w-4 h-4"
+        checked={checked}
+        onChange={() => toggleDraftMonthly(selectedDate, h.id)}
+        disabled={!canEditSelectedMonth || isBlocked}
+      />
+    </div>
+  );
+})}
     </div>
   </div>
 )}
@@ -1318,33 +1378,38 @@ function DisponibilidadeInner() {
 
                   <div className="space-y-2">
                     {dayExtras.map((e) => {
-                      const checked = extrasDraft.has(e.id);
-                      const count = extraCounts[e.id] || 0;
+  const checked = extrasDraft.has(e.id);
+  const count = extraCounts[e.id] || 0;
+  
+  // VERIFICAR SE ESTÁ BLOQUEADO
+  const blocked = blockedMasses.find(b => b.date === selectedDate);
+  const isBlocked = blocked && blocked.blocked_times && blocked.blocked_times.includes(e.time);
 
-                      return (
-                        <div
-                          key={e.id}
-                          className="flex items-center justify-between border rounded-lg px-3 py-2 bg-purple-50 border-purple-300"
-                        >
-                          <div>
-                            <div className="text-[11px] font-semibold text-purple-700">
-                              {e.time.slice(0, 5)}h — {e.title}
-                            </div>
-                            <div className="text-[9px] text-gray-600">
-                              Min {e.min_required} • Máx {e.max_allowed} • Atual {count}
-                            </div>
-                          </div>
+  return (
+    <div
+      key={e.id}
+      className={`flex items-center justify-between border rounded-lg px-3 py-2 ${isBlocked ? 'bg-red-50 border-red-300 opacity-60' : 'bg-purple-50 border-purple-300'}`}
+    >
+      <div>
+        <div className="text-[11px] font-semibold text-purple-700">
+          {e.time.slice(0, 5)}h – {e.title}
+          {isBlocked && <span className="ml-2 text-red-600 text-[9px]">NÃO HAVERÁ MISSA</span>}
+        </div>
+        <div className="text-[9px] text-gray-600">
+          {isBlocked ? `Motivo: ${blocked.reason || 'Não especificado'}` : `Min ${e.min_required} • Máx ${e.max_allowed} • Atual ${count}`}
+        </div>
+      </div>
 
-                          <input
-                            type="checkbox"
-                            className="w-4 h-4 text-purple-700"
-                            checked={checked}
-                            onChange={() => toggleDraftExtra(e.id)}
-                            disabled={!canEditSelectedMonth}
-                          />
-                        </div>
-                      );
-                    })}
+      <input
+        type="checkbox"
+        className="w-4 h-4 text-purple-700"
+        checked={checked}
+        onChange={() => toggleDraftExtra(e.id)}
+        disabled={!canEditSelectedMonth || isBlocked}
+      />
+    </div>
+  );
+})}
                   </div>
                 </div>
               )}
@@ -1458,4 +1523,3 @@ function DisponibilidadeInner() {
     </div>
   );
 }
-
