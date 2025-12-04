@@ -32,6 +32,7 @@ function MinistrosAdmin() {
   const { user } = useAuth();
 
   const [ministers, setMinisters] = useState<Minister[]>([]);
+  const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -282,20 +283,27 @@ function MinistrosAdmin() {
         </div>
       )}
 
-      <div className="mb-3 flex justify-between items-center">
-        <span className="text-xs text-gray-600">
-          Total de ministros: {ministers.length}
-        </span>
-        <button
-          onClick={() => {
-            setShowNewModal(true);
-            setError(null);
-          }}
-          className="px-3 py-1.5 text-xs rounded bg-[#4A6FA5] text-white hover:bg-[#3F5F8F]"
-        >
-          Novo Ministro
-        </button>
-      </div>
+      <div className="mb-3 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+  
+  <input
+    type="text"
+    placeholder="Buscar ministro..."
+    className="border rounded px-2 py-1 text-[11px] w-full sm:w-64"
+    value={searchTerm}
+    onChange={(e) => setSearchTerm(e.target.value)}
+  />
+
+  <button
+    onClick={() => {
+      setShowNewModal(true);
+      setError(null);
+    }}
+    className="px-3 py-1.5 text-xs rounded bg-[#4A6FA5] text-white hover:bg-[#3F5F8F]"
+  >
+    Novo Ministro
+  </button>
+</div>
+
 
       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
@@ -313,7 +321,10 @@ function MinistrosAdmin() {
           </thead>
           <tbody>
             {ministers
-  .filter(m => m.email !== SUPERADMIN_EMAIL)
+  .filter(m => 
+    m.email !== SUPERADMIN_EMAIL &&
+    m.name.toLowerCase().includes(searchTerm.toLowerCase())
+  )
   .map((m) => (
               <tr
                 key={m.id}
