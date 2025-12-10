@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Layout } from "../components/Layout";
 import { RequireAuth } from "../components/RequireAuth";
 import { supabase } from "../lib/supabaseClient";
@@ -14,6 +14,21 @@ type Extra = {
   active: boolean;
   created_at: string;
 };
+
+const MONTH_NAMES = [
+  "Janeiro",
+  "Fevereiro",
+  "Março",
+  "Abril",
+  "Maio",
+  "Junho",
+  "Julho",
+  "Agosto",
+  "Setembro",
+  "Outubro",
+  "Novembro",
+  "Dezembro",
+];
 
 export default function ExtrasPage() {
   return (
@@ -34,22 +49,28 @@ function ExtrasInner() {
   const [error, setError] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
 
-  const [showNewModal, setShowNewModal] = useState(false);
-  const [newTitle, setNewTitle] = useState("");
-  const [newDate, setNewDate] = useState("");
-  const [newTime, setNewTime] = useState("19:00");
-  const [newMin, setNewMin] = useState(1);
-  const [newMax, setNewMax] = useState(10);
+  // -------------------------------------------------------
+  // SELETOR DE MÊS E ANO — EXATAMENTE COMO DISPONIBILIDADE
+  // -------------------------------------------------------
+  const now = new Date();
+  const defaultMonth = now.getMonth() === 11 ? 0 : now.getMonth() + 1;
+  const defaultYear =
+    now.getMonth() === 11 ? now.getFullYear() + 1 : now.getFullYear();
 
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [editExtra, setEditExtra] = useState<Extra | null>(null);
-  const [editTitle, setEditTitle] = useState("");
-  const [editDate, setEditDate] = useState("");
-  const [editTime, setEditTime] = useState("19:00");
-  const [editMin, setEditMin] = useState(1);
-  const [editMax, setEditMax] = useState(10);
-  const [editActive, setEditActive] = useState(true);
+  const [month, setMonth] = useState(defaultMonth);
+  const [year, setYear] = useState(defaultYear);
 
+  // Filtragem do mês selecionado
+  const filtered = useMemo(() => {
+    return extras.filter((e) => {
+      const d = new Date(e.event_date + "T00:00:00");
+      return d.getMonth() === month && d.getFullYear() === year;
+    });
+  }, [extras, month, year]);
+
+  // -------------------------------------------------------
+  // CARREGAMENTO DOS DADOS
+  // -------------------------------------------------------
   useEffect(() => {
     const init = async () => {
       setLoading(true);
@@ -61,14 +82,15 @@ function ExtrasInner() {
           .select("is_admin")
           .eq("user_id", user.id)
           .maybeSingle();
+
         if (me) setIsAdmin(!!me.is_admin);
       }
 
       const { data, error } = await supabase
         .from("extras")
         .select("*")
-        .order("event_date")
-        .order("time");
+        .order("event_date", { ascending: true })
+        .order("time", { ascending: true });
 
       if (error) {
         setError("Erro ao carregar missas extras.");
@@ -87,10 +109,21 @@ function ExtrasInner() {
     const { data } = await supabase
       .from("extras")
       .select("*")
-      .order("event_date")
-      .order("time");
+      .order("event_date", { ascending: true })
+      .order("time", { ascending: true });
+
     if (data) setExtras(data as Extra[]);
   };
+
+  // -------------------------------------------------------
+  // CAMPOS DE CRIAÇÃO
+  // -------------------------------------------------------
+  const [showNewModal, setShowNewModal] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+  const [newDate, setNewDate] = useState("");
+  const [newTime, setNewTime] = useState("19:00");
+  const [newMin, setNewMin] = useState(1);
+  const [newMax, setNewMax] = useState(10);
 
   const handleCreate = async () => {
     if (!isAdmin) return;
@@ -119,8 +152,21 @@ function ExtrasInner() {
     setNewTime("19:00");
     setNewMin(1);
     setNewMax(10);
+
     await refresh();
   };
+
+  // -------------------------------------------------------
+  // CAMPOS DE EDIÇÃO
+  // -------------------------------------------------------
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editExtra, setEditExtra] = useState<Extra | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDate, setEditDate] = useState("");
+  const [editTime, setEditTime] = useState("19:00");
+  const [editMin, setEditMin] = useState(1);
+  const [editMax, setEditMax] = useState(10);
+  const [editActive, setEditActive] = useState(true);
 
   const openEdit = (e: Extra) => {
     setEditExtra(e);
@@ -177,9 +223,13 @@ function ExtrasInner() {
     setSaving(false);
     setShowEditModal(false);
     setEditExtra(null);
+
     await refresh();
   };
 
+  // -------------------------------------------------------
+  // LOADING
+  // -------------------------------------------------------
   if (loading) {
     return (
       <div className="max-w-5xl mx-auto">
@@ -189,7 +239,9 @@ function ExtrasInner() {
     );
   }
 
-  const upcoming = extras;
+  // ===========================================================
+  // ======================= RENDER =============================
+  // ===========================================================
 
   return (
     <div className="max-w-5xl mx-auto">
@@ -198,12 +250,49 @@ function ExtrasInner() {
         Cadastre aqui celebrações de solenidade.
       </p>
 
+      {/* ============================
+          SELETOR IGUAL DISPONIBILIDADE
+      ============================ */}
+      <div className="flex items-center gap-2 mb-4">
+
+        {/* SELECT MÊS */}
+        <select
+          className="border rounded px-2 py-1 text-[10px]"
+          value={month}
+          onChange={(e) => setMonth(Number(e.target.value))}
+        >
+          {MONTH_NAMES.map((name, idx) => (
+            <option key={idx} value={idx}>
+              {name}
+            </option>
+          ))}
+        </select>
+
+        {/* SELECT ANO */}
+        <select
+          className="border rounded px-2 py-1 text-[10px] w-20"
+          value={year}
+          onChange={(e) => setYear(Number(e.target.value))}
+        >
+          {Array.from({ length: 10 }).map((_, i) => {
+            const y = new Date().getFullYear() - 2 + i;
+            return (
+              <option key={y} value={y}>
+                {y}
+              </option>
+            );
+          })}
+        </select>
+      </div>
+
+      {/* ERROS */}
       {error && (
         <div className="mb-3 text-sm text-red-600 bg-red-50 border border-red-200 px-3 py-2 rounded">
           {error}
         </div>
       )}
 
+      {/* Botão criar */}
       {isAdmin && (
         <div className="flex justify-end mb-3">
           <button
@@ -218,14 +307,17 @@ function ExtrasInner() {
         </div>
       )}
 
+      {/* ====================
+          TABELA DO MÊS SELECIONADO
+      ==================== */}
       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
         <div className="px-3 py-2 bg-[#D6E6F7] text-[10px] text-[#3F5F8F] font-semibold">
-          Missas extras cadastradas
+          Missas extras — {MONTH_NAMES[month]} / {year}
         </div>
 
-        {upcoming.length === 0 ? (
+        {filtered.length === 0 ? (
           <div className="px-3 py-2 text-[10px] text-gray-500">
-            Nenhuma missa extra cadastrada.
+            Nenhuma missa extra cadastrada neste mês.
           </div>
         ) : (
           <table className="min-w-full text-[10px]">
@@ -240,17 +332,28 @@ function ExtrasInner() {
                 {isAdmin && <th className="px-2 py-1 text-center">Ações</th>}
               </tr>
             </thead>
+
             <tbody>
-              {upcoming.map((e) => {
+              {filtered.map((e) => {
                 const date = new Date(e.event_date + "T00:00:00");
+
                 return (
                   <tr key={e.id} className="border-t border-gray-100">
-                    <td className="px-2 py-1">{date.toLocaleDateString("pt-BR")}</td>
+                    <td className="px-2 py-1">
+                      {date.toLocaleDateString("pt-BR")}
+                    </td>
+
                     <td className="px-2 py-1">{e.time.slice(0, 5)}h</td>
+
                     <td className="px-2 py-1">{e.title}</td>
+
                     <td className="px-2 py-1 text-center">{e.min_required}</td>
+
                     <td className="px-2 py-1 text-center">{e.max_allowed}</td>
-                    <td className="px-2 py-1 text-center">{e.active ? "Sim" : "Não"}</td>
+
+                    <td className="px-2 py-1 text-center">
+                      {e.active ? "Sim" : "Não"}
+                    </td>
 
                     {isAdmin && (
                       <td className="px-2 py-1 text-center">
@@ -270,6 +373,9 @@ function ExtrasInner() {
         )}
       </div>
 
+      {/* =======================================================
+          MODAL DE NOVA MISSA
+      ======================================================= */}
       {showNewModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-sm border border-[#D6E6F7] p-4">
@@ -314,15 +420,10 @@ function ExtrasInner() {
                     Mínimo
                   </label>
                   <input
-                    type="tel"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
+                    type="number"
                     className="w-full border rounded px-2 py-1 text-sm"
                     value={newMin}
-                    onChange={(e) => {
-                      const n = e.target.value.replace(/\D/g, "");
-                      setNewMin(n === "" ? 0 : Number(n));
-                    }}
+                    onChange={(e) => setNewMin(Number(e.target.value))}
                   />
                 </div>
 
@@ -331,15 +432,10 @@ function ExtrasInner() {
                     Máximo
                   </label>
                   <input
-                    type="tel"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
+                    type="number"
                     className="w-full border rounded px-2 py-1 text-sm"
                     value={newMax}
-                    onChange={(e) => {
-                      const n = e.target.value.replace(/\D/g, "");
-                      setNewMax(n === "" ? 0 : Number(n));
-                    }}
+                    onChange={(e) => setNewMax(Number(e.target.value))}
                   />
                 </div>
               </div>
@@ -366,11 +462,14 @@ function ExtrasInner() {
         </div>
       )}
 
+      {/* =======================================================
+          MODAL DE EDIÇÃO
+      ======================================================= */}
       {showEditModal && editExtra && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-sm border border-[#D6E6F7] p-4">
             <h3 className="text-sm font-semibold text-[#4A6FA5] mb-2">
-              Editar missa extra
+              Editar Missa Solene
             </h3>
 
             <div className="space-y-2 mb-3">
@@ -410,15 +509,10 @@ function ExtrasInner() {
                     Mínimo
                   </label>
                   <input
-                    type="tel"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
+                    type="number"
                     className="w-full border rounded px-2 py-1 text-sm"
                     value={editMin}
-                    onChange={(e) => {
-                      const n = e.target.value.replace(/\D/g, "");
-                      setEditMin(n === "" ? 0 : Number(n));
-                    }}
+                    onChange={(e) => setEditMin(Number(e.target.value))}
                   />
                 </div>
 
@@ -427,29 +521,22 @@ function ExtrasInner() {
                     Máximo
                   </label>
                   <input
-                    type="tel"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
+                    type="number"
                     className="w-full border rounded px-2 py-1 text-sm"
                     value={editMax}
-                    onChange={(e) => {
-                      const n = e.target.value.replace(/\D/g, "");
-                      setEditMax(n === "" ? 0 : Number(n));
-                    }}
+                    onChange={(e) => setEditMax(Number(e.target.value))}
                   />
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 mt-1">
-                <label className="flex items-center gap-1 text-[10px] text-gray-700">
-                  <input
-                    type="checkbox"
-                    checked={editActive}
-                    onChange={(e) => setEditActive(e.target.checked)}
-                  />
-                  Ativo
-                </label>
-              </div>
+              <label className="flex items-center gap-1 text-[10px] text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={editActive}
+                  onChange={(e) => setEditActive(e.target.checked)}
+                />
+                Ativo
+              </label>
             </div>
 
             <div className="flex justify-between items-center gap-2">
