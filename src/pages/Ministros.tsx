@@ -54,6 +54,11 @@ function MinistrosAdmin() {
   const [editIsAdmin, setEditIsAdmin] = useState(false);
   const [editActive, setEditActive] = useState(true);
 
+  // --- Contadores de ministros ---
+const totalAtivos = ministers.filter(m => m.active).length;
+const totalInativos = ministers.filter(m => !m.active).length;
+
+
   // Carrega ministros + descobre se usuário atual é admin
   useEffect(() => {
     const fetchMinisters = async () => {
@@ -270,6 +275,19 @@ function MinistrosAdmin() {
       <h2 className="text-lg font-semibold mb-3 text-[#4A6FA5]">
         Ministros - Administração
       </h2>
+      {/* Estatísticas de ministros */}
+<div className="mb-3 flex gap-3 text-[11px]">
+  <div className="flex-1 bg-white border border-gray-200 rounded-lg p-2 text-center">
+    <p className="text-[#4A6FA5] font-semibold">{totalAtivos}</p>
+    <p className="text-gray-600 text-[10px]">Ativos</p>
+  </div>
+
+  <div className="flex-1 bg-white border border-gray-200 rounded-lg p-2 text-center">
+    <p className="text-red-600 font-semibold">{totalInativos}</p>
+    <p className="text-gray-600 text-[10px]">Inativos</p>
+  </div>
+</div>
+
 
       <p className="text-[11px] text-gray-700 mb-3">
         Ao cadastrar um novo ministro, o sistema cria automaticamente o usuário

@@ -33,7 +33,7 @@ export default function RelatoriosPage() {
           </div>
 
           {/* Abas */}
-          <div className="flex flex-wrap gap-2 text-[9px]">
+          <div className="flex flex-wrap gap-1 text-[11px]">
             <TabButton
               label="Cobertura de horários"
               active={activeTab === "coverage"}
