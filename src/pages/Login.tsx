@@ -79,10 +79,14 @@ export default function Login() {
     setLoading(true);
 
     try {
-      const { error: signInError } = await signIn(
-        email.trim(),
-        password.trim()
-      );
+      // força e-mail minúsculo ao logar
+const normalizedEmail = email.trim().toLowerCase();
+
+const { error: signInError } = await signIn(
+  normalizedEmail,
+  password.trim()
+);
+
 
       if (signInError) {
         console.error(signInError);
@@ -227,66 +231,83 @@ export default function Login() {
   // ---------------- CADASTRO COM CÓDIGO ----------------
 
   const handleRegister = async () => {
-    if (!regCode.trim() || !regName.trim() || !regEmail.trim()) {
-      setError("Preencha código, nome e e-mail.");
-      return;
-    }
+  if (!regCode.trim() || !regName.trim() || !regEmail.trim()) {
+    setError("Preencha código, nome e e-mail.");
+    return;
+  }
 
-    if (!regPassword || regPassword.length < 6) {
-      setError("A senha deve ter pelo menos 6 caracteres.");
-      return;
-    }
+  // cria variável auxiliar para normalizar email
+  const normalizedEmail = regEmail.trim().toLowerCase();
 
-    if (regPassword !== regPassword2) {
-      setError("As senhas não conferem.");
-      return;
-    }
+  if (!regPassword || regPassword.length < 6) {
+    setError("A senha deve ter pelo menos 6 caracteres.");
+    return;
+  }
 
-    setLoading(true);
-    setError(null);
+  // impede cadastro com e-mail já existente
+  const { data: existing } = await supabase
+    .from("ministers")
+    .select("id")
+    .eq("email", normalizedEmail)
+    .maybeSingle();
 
-    try {
-      const { data, error } = await supabase.functions.invoke(
-        "register-with-code",
-        {
-          body: {
-            code: regCode.trim(),
-            name: regName.trim(),
-            email: regEmail.trim(),
-            phone: regPhone.trim() || null,
-            password: regPassword,
-          },
-        }
-      );
+  if (existing) {
+    setError("Este e-mail já está cadastrado no sistema.");
+    setLoading(false);
+    return;
+  }
 
-      if (error || (data as any)?.error) {
-        console.error(error || (data as any)?.error);
-        setError(
-          (data as any)?.error || "Não foi possível concluir o cadastro."
-        );
-        setLoading(false);
-        return;
+  if (regPassword !== regPassword2) {
+    setError("As senhas não conferem.");
+    return;
+  }
+
+  setLoading(true);
+  setError(null);
+
+  try {
+    const { data, error } = await supabase.functions.invoke(
+      "register-with-code",
+      {
+        body: {
+          code: regCode.trim(),
+          name: regName.trim(),
+          email: normalizedEmail, // já em lowercase
+          phone: regPhone.trim() || null,
+          password: regPassword,
+        },
       }
+    );
 
-      setMode("login");
-      setEmail(regEmail.trim());
-      setPassword("");
-
-      setRegCode("");
-      setRegName("");
-      setRegEmail("");
-      setRegPhone("");
-      setRegPassword("");
-      setRegPassword2("");
-
-      setError("Cadastro realizado com sucesso!");
+    if (error || (data as any)?.error) {
+      console.error(error || (data as any)?.error);
+      setError(
+        (data as any)?.error || "Não foi possível concluir o cadastro."
+      );
       setLoading(false);
-    } catch (err) {
-      console.error(err);
-      setError("Erro inesperado ao realizar cadastro.");
-      setLoading(false);
+      return;
     }
-  };
+
+    // coloca o e-mail normalizado no campo de login após cadastro
+    setMode("login");
+    setEmail(normalizedEmail);
+    setPassword("");
+
+    setRegCode("");
+    setRegName("");
+    setRegEmail("");
+    setRegPhone("");
+    setRegPassword("");
+    setRegPassword2("");
+
+    setError("Cadastro realizado com sucesso!");
+    setLoading(false);
+  } catch (err) {
+    console.error(err);
+    setError("Erro inesperado ao realizar cadastro.");
+    setLoading(false);
+  }
+};
 
   // ---------------- UI HELPERS ----------------
 

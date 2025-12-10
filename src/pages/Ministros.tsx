@@ -124,13 +124,27 @@ const totalInativos = ministers.filter(m => !m.active).length;
       setError("Nome e e-mail são obrigatórios.");
       return;
     }
+// força e-mail minúsculo
+const normalizedEmail = newEmail.trim().toLowerCase();
+
+// bloqueia e-mail duplicado antes de chamar a edge function
+const { data: existing } = await supabase
+  .from("ministers")
+  .select("id")
+  .eq("email", normalizedEmail)
+  .maybeSingle();
+
+if (existing) {
+  setError("Este e-mail já está cadastrado.");
+  return;
+}
 
     setSaving(true);
 
     const { data, error } = await supabase.functions.invoke("create-minister", {
       body: {
         name: newName.trim(),
-        email: newEmail.trim(),
+        email: normalizedEmail,
         phone: newPhone.trim() || null,
       },
     });
@@ -176,6 +190,21 @@ const totalInativos = ministers.filter(m => !m.active).length;
       setError("Nome e e-mail são obrigatórios.");
       return;
     }
+// força e-mail minúsculo
+const normalizedEmail = editEmail.trim().toLowerCase();
+
+// impede duplicação (exceto ele mesmo)
+const { data: exists } = await supabase
+  .from("ministers")
+  .select("id")
+  .eq("email", normalizedEmail)
+  .neq("id", editMinister.id)
+  .maybeSingle();
+
+if (exists) {
+  setError("Outro ministro já está usando este e-mail.");
+  return;
+}
 
     setSaving(true);
     setError(null);
@@ -184,7 +213,7 @@ const totalInativos = ministers.filter(m => !m.active).length;
       .from("ministers")
       .update({
         name: editName.trim(),
-        email: editEmail.trim(),
+        email: normalizedEmail,
         phone: editPhone.trim() || null,
         is_admin: editIsAdmin,
         active: editActive,
