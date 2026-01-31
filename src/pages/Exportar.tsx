@@ -144,19 +144,29 @@ function NamesRow({
   const ref = useRef<HTMLDivElement>(null);
   const compact = useMemo(() => compactNames(nomes), [nomes]);
 
+  // Calcular tamanho da fonte baseado na quantidade de nomes
+  const fontSize = useMemo(() => {
+    if (!singleLine) return 10;
+    const numNomes = compact.length;
+    if (numNomes <= 4) return 10;
+    if (numNomes <= 6) return 9;
+    if (numNomes <= 8) return 8.5;
+    return 8; // Para 9+ nomes
+  }, [compact.length, singleLine]);
+
   useEffect(() => {
     if (!singleLine || !ref.current) return;
     const el = ref.current;
     const parent = el.parentElement;
     if (!parent) return;
-    let size = 11;
+    let size = fontSize;
     el.style.fontSize = `${size}px`;
     el.style.whiteSpace = "nowrap";
-    while (el.scrollWidth > parent.clientWidth && size > 8) {
+    while (el.scrollWidth > parent.clientWidth && size > 7) {
       size -= 0.5;
       el.style.fontSize = `${size}px`;
     }
-  }, [compact, singleLine]);
+  }, [compact, singleLine, fontSize]);
 
   if (!compact.length) return <span className="text-gray-500">—</span>;
 
@@ -179,7 +189,8 @@ function NamesRow({
   return (
     <div
       ref={ref}
-      className="text-[10px] font-semibold whitespace-nowrap overflow-hidden"
+      style={{ fontSize: `${fontSize}px` }}
+      className="font-semibold whitespace-nowrap overflow-hidden"
     >
       {compact.slice(0, MAX).join(" - ")}
     </div>
