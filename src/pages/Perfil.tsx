@@ -10,6 +10,7 @@ type MinisterProfile = {
   name: string | null;
   phone?: string | null;
   is_admin?: boolean | null;
+  birth_date?: string | null;
 };
 
 const PerfilPage: React.FC = () => {
@@ -31,6 +32,7 @@ const PerfilInner: React.FC = () => {
   // campos editáveis
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [birthDate, setBirthDate] = useState("");
 
   // feedback perfil
   const [savingProfile, setSavingProfile] = useState(false);
@@ -44,6 +46,12 @@ const PerfilInner: React.FC = () => {
   const [passwordMessage, setPasswordMessage] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
 
+  // modal de data de aniversário obrigatória
+  const [showBirthdateModal, setShowBirthdateModal] = useState(false);
+  const [modalBirthDate, setModalBirthDate] = useState("");
+  const [savingModalBirthdate, setSavingModalBirthdate] = useState(false);
+  const [modalError, setModalError] = useState<string | null>(null);
+
   // Carrega (ou cria) o registro de minister vinculado ao user_id atual
   useEffect(() => {
     if (!user) return;
@@ -56,7 +64,7 @@ const PerfilInner: React.FC = () => {
         // tenta achar ministro pelo user_id
         let { data, error } = await supabase
           .from("ministers")
-          .select("id, name, phone, is_admin")
+          .select("id, name, phone, is_admin, birth_date")
           .eq("user_id", user.id)
           .maybeSingle();
 
@@ -85,7 +93,7 @@ const PerfilInner: React.FC = () => {
           const insertResult = await supabase
             .from("ministers")
             .insert(insertPayload)
-            .select("id, name, phone, is_admin")
+            .select("id, name, phone, is_admin, birth_date")
             .single();
 
           if (insertResult.error) {
@@ -107,6 +115,12 @@ const PerfilInner: React.FC = () => {
         setMinister(ministerData);
         setName(ministerData.name || "");
         setPhone(ministerData.phone || "");
+        setBirthDate(ministerData.birth_date || "");
+
+        // Verifica se precisa mostrar o modal de data de aniversário
+        if (!ministerData.birth_date) {
+          setShowBirthdateModal(true);
+        }
       } catch (e) {
         console.error(e);
         setProfileError("Erro inesperado ao carregar seus dados.");
@@ -131,6 +145,7 @@ const PerfilInner: React.FC = () => {
       const updates: Partial<MinisterProfile> = {
         name: name.trim() || null,
         phone: phone.trim() || null,
+        birth_date: birthDate || null,
       };
 
       const { error } = await supabase
@@ -149,6 +164,7 @@ const PerfilInner: React.FC = () => {
                 ...prev,
                 name: updates.name ?? prev.name,
                 phone: updates.phone ?? prev.phone,
+                birth_date: updates.birth_date ?? prev.birth_date,
               }
             : prev
         );
@@ -156,6 +172,46 @@ const PerfilInner: React.FC = () => {
     } finally {
       setSavingProfile(false);
       setTimeout(() => setProfileMessage(null), 4000);
+    }
+  }
+
+  // Salvar data de aniversário via modal
+  async function handleSaveModalBirthdate(e: React.FormEvent) {
+    e.preventDefault();
+    if (!user || !minister) return;
+
+    setModalError(null);
+
+    if (!modalBirthDate) {
+      setModalError("Por favor, preencha sua data de aniversário.");
+      return;
+    }
+
+    setSavingModalBirthdate(true);
+
+    try {
+      const { error } = await supabase
+        .from("ministers")
+        .update({ birth_date: modalBirthDate })
+        .eq("id", minister.id);
+
+      if (error) {
+        console.error("Erro ao salvar data de aniversário:", error);
+        setModalError("Erro ao salvar. Tente novamente.");
+      } else {
+        setBirthDate(modalBirthDate);
+        setMinister((prev) =>
+          prev
+            ? {
+                ...prev,
+                birth_date: modalBirthDate,
+              }
+            : prev
+        );
+        setShowBirthdateModal(false);
+      }
+    } finally {
+      setSavingModalBirthdate(false);
     }
   }
 
@@ -208,6 +264,52 @@ const PerfilInner: React.FC = () => {
 
   return (
     <div className="max-w-3xl mx-auto mt-6 mb-10">
+      {/* Modal obrigatório para data de aniversário */}
+      {showBirthdateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
+            <h2 className="text-lg font-semibold text-[#1f3c88] mb-2">
+              Complete seu cadastro
+            </h2>
+            <p className="text-[11px] text-gray-600 mb-4">
+              Para continuar, precisamos que você informe sua data de aniversário. 
+              Este dado é importante para a gestão da equipe.
+            </p>
+
+            <form onSubmit={handleSaveModalBirthdate}>
+              <div className="mb-4">
+                <label className="block text-[10px] text-gray-600 mb-1">
+                  Data de aniversário *
+                </label>
+                <input
+                  type="date"
+                  value={modalBirthDate}
+                  onChange={(e) => setModalBirthDate(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-lg text-[11px]"
+                  required
+                />
+              </div>
+
+              {modalError && (
+                <div className="mb-3 text-[10px] text-red-700 bg-red-50 border border-red-200 px-3 py-2 rounded">
+                  {modalError}
+                </div>
+              )}
+
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  disabled={savingModalBirthdate}
+                  className="px-4 py-2 rounded-full bg-[#1f3c88] text-white text-[10px] font-semibold hover:bg-[#182f6a] disabled:opacity-60"
+                >
+                  {savingModalBirthdate ? "Salvando..." : "Salvar e continuar"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       <h1 className="text-xl font-semibold text-[#1f3c88] mb-1">
         Meu Perfil
       </h1>
@@ -282,6 +384,18 @@ const PerfilInner: React.FC = () => {
                       className="w-full px-3 py-2 border rounded-lg text-[11px]"
                       placeholder="Digite seu nome"
                       required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] text-gray-600 mb-1">
+                      Data de aniversário
+                    </label>
+                    <input
+                      type="date"
+                      value={birthDate}
+                      onChange={(e) => setBirthDate(e.target.value)}
+                      className="w-full px-3 py-2 border rounded-lg text-[11px]"
                     />
                   </div>
 

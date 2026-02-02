@@ -835,12 +835,15 @@ if (dayBlock && dayBlock.blocked_times && dayBlock.blocked_times.length > 0) {
       </div>
 
       <div className="mt-1 text-[11px] text-[#4A6FA5] leading-snug">
-        {entries.map((entry, idx) => (
-          <span key={idx}>
-            {idx > 0 && " - "}
-            {entry.ministerName}
-          </span>
-        ))}
+        {/* Remove duplicatas de ministros no mesmo horário */}
+        {Array.from(new Set(entries.map(e => e.ministerName)))
+          .filter(name => name) // Remove nomes vazios
+          .map((name, idx) => (
+            <span key={idx}>
+              {idx > 0 && " - "}
+              {name}
+            </span>
+          ))}
       </div>
     </div>
   );

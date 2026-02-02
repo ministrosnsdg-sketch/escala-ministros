@@ -9,8 +9,9 @@ import ResumoPorMinistro from "./relatorios/ResumoPorMinistro";
 
 // 🆕 IMPORTAR O NOVO RELATÓRIO
 import BloqueiosDeMissas from "./relatorios/BloqueiosDeMissas";
+import Aniversariantes from "./relatorios/Aniversariantes";
 
-type TabKey = "coverage" | "codes" | "settings" | "ranking" | "blocked";
+type TabKey = "coverage" | "codes" | "settings" | "ranking" | "blocked" | "birthdays";
 
 export default function RelatoriosPage() {
   const [activeTab, setActiveTab] = useState<TabKey>("coverage");
@@ -63,6 +64,12 @@ export default function RelatoriosPage() {
               active={activeTab === "ranking"}
               onClick={() => setActiveTab("ranking")}
             />
+
+            <TabButton
+              label="Aniversariantes"
+              active={activeTab === "birthdays"}
+              onClick={() => setActiveTab("birthdays")}
+            />
           </div>
 
           {/* Conteúdo da aba */}
@@ -71,6 +78,7 @@ export default function RelatoriosPage() {
           {activeTab === "codes" && <AdminInviteCodes />}
           {activeTab === "settings" && <DisponibilidadeJanelaConfig />}
           {activeTab === "ranking" && <ResumoPorMinistro />}
+          {activeTab === "birthdays" && <Aniversariantes />}
         </div>
       </Layout>
     </RequireAuth>

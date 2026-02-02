@@ -11,6 +11,7 @@ type Minister = {
   name: string;
   email: string | null;
   phone: string | null;
+  birth_date: string | null;
   is_admin: boolean;
   active: boolean;
   must_reset_password: boolean;
@@ -44,6 +45,7 @@ function MinistrosAdmin() {
   const [newName, setNewName] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [newPhone, setNewPhone] = useState("");
+  const [newBirthDate, setNewBirthDate] = useState("");
 
   // Editar ministro modal
   const [showEditModal, setShowEditModal] = useState(false);
@@ -51,6 +53,7 @@ function MinistrosAdmin() {
   const [editName, setEditName] = useState("");
   const [editEmail, setEditEmail] = useState("");
   const [editPhone, setEditPhone] = useState("");
+  const [editBirthDate, setEditBirthDate] = useState("");
   const [editIsAdmin, setEditIsAdmin] = useState(false);
   const [editActive, setEditActive] = useState(true);
 
@@ -124,6 +127,11 @@ const totalInativos = ministers.filter(m => !m.active).length;
       setError("Nome e e-mail são obrigatórios.");
       return;
     }
+
+    if (!newBirthDate) {
+      setError("A data de aniversário é obrigatória.");
+      return;
+    }
 // força e-mail minúsculo
 const normalizedEmail = newEmail.trim().toLowerCase();
 
@@ -146,6 +154,7 @@ if (existing) {
         name: newName.trim(),
         email: normalizedEmail,
         phone: newPhone.trim() || null,
+        birth_date: newBirthDate || null,
       },
     });
 
@@ -163,6 +172,7 @@ if (existing) {
     setNewName("");
     setNewEmail("");
     setNewPhone("");
+    setNewBirthDate("");
     setShowNewModal(false);
     await refresh();
   };
@@ -177,6 +187,7 @@ if (existing) {
   setEditName(m.name);
   setEditEmail(m.email || "");
   setEditPhone(m.phone || "");
+  setEditBirthDate(m.birth_date || "");
   setEditIsAdmin(m.is_admin);
   setEditActive(m.active);
   setShowEditModal(true);
@@ -188,6 +199,11 @@ if (existing) {
 
     if (!editName.trim() || !editEmail.trim()) {
       setError("Nome e e-mail são obrigatórios.");
+      return;
+    }
+
+    if (!editBirthDate) {
+      setError("A data de aniversário é obrigatória.");
       return;
     }
 // força e-mail minúsculo
@@ -215,6 +231,7 @@ if (exists) {
         name: editName.trim(),
         email: normalizedEmail,
         phone: editPhone.trim() || null,
+        birth_date: editBirthDate || null,
         is_admin: editIsAdmin,
         active: editActive,
       })
@@ -443,6 +460,18 @@ if (exists) {
               </div>
               <div>
                 <label className="block text-[10px] text-gray-600 mb-1">
+                  Data de aniversário *
+                </label>
+                <input
+                  type="date"
+                  className="w-full border rounded px-2 py-1 text-sm"
+                  value={newBirthDate}
+                  onChange={(e) => setNewBirthDate(e.target.value)}
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] text-gray-600 mb-1">
                   Telefone (opcional)
                 </label>
                 <input
@@ -460,6 +489,7 @@ if (exists) {
                   setNewName("");
                   setNewEmail("");
                   setNewPhone("");
+                  setNewBirthDate("");
                 }}
                 className="px-3 py-1 text-[10px] rounded border border-gray-300 hover:bg-gray-50"
                 disabled={saving}
@@ -506,6 +536,18 @@ if (exists) {
                   className="w-full border rounded px-2 py-1 text-sm"
                   value={editEmail}
                   onChange={(e) => setEditEmail(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] text-gray-600 mb-1">
+                  Data de aniversário *
+                </label>
+                <input
+                  type="date"
+                  className="w-full border rounded px-2 py-1 text-sm"
+                  value={editBirthDate}
+                  onChange={(e) => setEditBirthDate(e.target.value)}
+                  required
                 />
               </div>
               <div>

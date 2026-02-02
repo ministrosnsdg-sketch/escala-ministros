@@ -32,6 +32,7 @@ export default function Login() {
   const [regName, setRegName] = useState("");
   const [regEmail, setRegEmail] = useState("");
   const [regPhone, setRegPhone] = useState("");
+  const [regBirthDate, setRegBirthDate] = useState("");
   const [regCode, setRegCode] = useState("");
   const [regPassword, setRegPassword] = useState("");
   const [regPassword2, setRegPassword2] = useState("");
@@ -236,6 +237,11 @@ const { error: signInError } = await signIn(
     return;
   }
 
+  if (!regBirthDate) {
+    setError("A data de aniversário é obrigatória.");
+    return;
+  }
+
   // cria variável auxiliar para normalizar email
   const normalizedEmail = regEmail.trim().toLowerCase();
 
@@ -274,6 +280,7 @@ const { error: signInError } = await signIn(
           name: regName.trim(),
           email: normalizedEmail, // já em lowercase
           phone: regPhone.trim() || null,
+          birth_date: regBirthDate || null,
           password: regPassword,
         },
       }
@@ -530,6 +537,17 @@ const { error: signInError } = await signIn(
                   className="w-full border rounded px-2 py-1 text-sm"
                   value={regEmail}
                   onChange={(e) => setRegEmail(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <label className="block text-[10px]">Data de aniversário *</label>
+                <input
+                  type="date"
+                  className="w-full border rounded px-2 py-1 text-sm"
+                  value={regBirthDate}
+                  onChange={(e) => setRegBirthDate(e.target.value)}
+                  required
                 />
               </div>
 
