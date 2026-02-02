@@ -288,7 +288,7 @@ setBlockedMasses(blocks);
             (avData || []).forEach((r: any) => {
               if (r.minister_id !== ministerId) return;
               const time =
-                horarioMap.get(r.horario_id as number) || "";
+                hMap.get(r.horario_id as number) || "";
               myAss.push({
                 date: r.date as string,
                 kind: "Disponibilidade",
@@ -643,7 +643,7 @@ setBlockedMasses(blocks);
                           {a.date.split("-").reverse().join("/")}
                         </td>
                         <td className={strongCell + " text-center"}>
-                          {(a.time || "").slice(0, 5)}h
+                          {a.time ? `${a.time.slice(0, 5)}h` : "-"}
                         </td>
                         <td className={normalCell}>
                           {a.title ||
