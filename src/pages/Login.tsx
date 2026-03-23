@@ -1,34 +1,42 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "../lib/supabaseClient";
+import { supabase, setRememberMe, getRememberMe } from "../lib/supabaseClient";
+import {
+  isBiometricAvailable,
+  getBiometricLabel,
+  hasSavedBiometric,
+  isBiometricEnabled,
+  saveBiometricCredentials,
+  loadBiometricCredentials,
+  requestBiometricAuth,
+} from "../lib/biometricHelpers";
 
 type Mode = "login" | "changePassword" | "register" | "forgotPassword";
 
 export default function Login() {
   const { signIn } = useAuth();
   const navigate = useNavigate();
-
   const [mode, setMode] = useState<Mode>("login");
 
-  // login
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [rememberMe, setRememberMe] = useState(true);
-
-  // estados gerais
+  const [rememberMe, setRememberMeState] = useState(getRememberMe());
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-
-  // 🔵 RESET DE SENHA (TELA ESPECÍFICA)
   const [resetEmail, setResetEmail] = useState("");
-
-  // troca de senha obrigatória
   const [newPassword, setNewPassword] = useState("");
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
   const [pendingUserId, setPendingUserId] = useState<string | null>(null);
 
-  // cadastro com código
+  // Biometric state
+  const [biometricSupported] = useState(isBiometricAvailable());
+  const [biometricSaved, setBiometricSaved] = useState(hasSavedBiometric());
+
+  // Modal pós-login para perguntar sobre biometria
+  const [showBiometricPrompt, setShowBiometricPrompt] = useState(false);
+  const [pendingLoginCredentials, setPendingLoginCredentials] = useState<{email: string; password: string} | null>(null);
+
   const [regName, setRegName] = useState("");
   const [regEmail, setRegEmail] = useState("");
   const [regPhone, setRegPhone] = useState("");
@@ -37,560 +45,366 @@ export default function Login() {
   const [regPassword, setRegPassword] = useState("");
   const [regPassword2, setRegPassword2] = useState("");
 
-  const isChangeMode = mode === "changePassword";
-  const isRegisterMode = mode === "register";
-  const isForgot = mode === "forgotPassword";
-
-  useEffect(() => {
-    return () => {
-      window.onbeforeunload = null;
-    };
-  }, []);
+  useEffect(() => { }, []);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
-
-    if (isChangeMode) {
-      await handleChangePassword();
-      return;
-    }
-
-    if (isRegisterMode) {
-      await handleRegister();
-      return;
-    }
-
-    if (isForgot) {
-      await handleResetPassword();
-      return;
-    }
-
+    if (mode === "changePassword") { await handleChangePassword(); return; }
+    if (mode === "register") { await handleRegister(); return; }
+    if (mode === "forgotPassword") { await handleResetPassword(); return; }
     await handleLogin();
   };
 
-  // ---------------- LOGIN NORMAL ----------------
-
-  const handleLogin = async () => {
-    if (!email.trim() || !password.trim()) {
-      setError("Informe e-mail e senha.");
-      return;
-    }
-
+  const handleLogin = async (overrideEmail?: string, overridePassword?: string) => {
+    const loginEmail = overrideEmail || email.trim();
+    const loginPassword = overridePassword || password.trim();
+    if (!loginEmail || !loginPassword) { setError("Informe e-mail e senha."); return; }
     setLoading(true);
-
     try {
-      // força e-mail minúsculo ao logar
-const normalizedEmail = email.trim().toLowerCase();
-
-const { error: signInError } = await signIn(
-  normalizedEmail,
-  password.trim()
-);
-
-
-      if (signInError) {
-        console.error(signInError);
-        setError("E-mail ou senha inválidos.");
-        setLoading(false);
-        return;
-      }
-
-      const {
-        data: { user },
-        error: userErr,
-      } = await supabase.auth.getUser();
-
-      if (userErr || !user) {
-        console.error(userErr);
-        setError("Não foi possível obter os dados do usuário.");
-        setLoading(false);
-        return;
-      }
-
-      // Verifica se precisa trocar senha (ministro criado pelo admin)
-      const { data: mins, error: minsErr } = await supabase
-        .from("ministers")
-        .select("id, must_reset_password")
-        .eq("user_id", user.id)
-        .limit(1);
-
-      if (minsErr) {
-        console.error(minsErr);
-        setLoading(false);
-        navigate("/escala", { replace: true });
-        return;
-      }
-
-      if (mins && mins[0]?.must_reset_password) {
-        setPendingUserId(user.id);
-        setMode("changePassword");
-        setLoading(false);
-        return;
-      }
-
+      const normalizedEmail = loginEmail.toLowerCase();
+      const { error: signInError } = await signIn(normalizedEmail, loginPassword);
+      if (signInError) { setError("E-mail ou senha inválidos."); setLoading(false); return; }
+      const { data: { user }, error: userErr } = await supabase.auth.getUser();
+      if (userErr || !user) { setError("Não foi possível obter os dados do usuário."); setLoading(false); return; }
+      const { data: mins } = await supabase.from("ministers").select("id, must_reset_password").eq("user_id", user.id).limit(1);
+      if (mins && mins[0]?.must_reset_password) { setPendingUserId(user.id); setMode("changePassword"); setLoading(false); return; }
       if (!rememberMe) {
-        window.onbeforeunload = () => supabase.auth.signOut();
+        setRememberMe(false);
       } else {
-        window.onbeforeunload = null;
+        setRememberMe(true);
+      }
+      setLoading(false);
+
+      // Se biometria está disponível e ainda NÃO está habilitada, perguntar ao usuário
+      if (biometricSupported && !isBiometricEnabled() && !overrideEmail) {
+        setPendingLoginCredentials({ email: normalizedEmail, password: loginPassword });
+        setShowBiometricPrompt(true);
+        return;
       }
 
-      setLoading(false);
+      // Se biometria já está habilitada, atualizar credenciais silenciosamente
+      if (biometricSupported && isBiometricEnabled() && !overrideEmail) {
+        saveBiometricCredentials(normalizedEmail, loginPassword);
+      }
+
       navigate("/escala", { replace: true });
-    } catch (err) {
-      console.error(err);
-      setError("Erro inesperado ao tentar entrar.");
+    } catch { setError("Erro inesperado ao tentar entrar."); setLoading(false); }
+  };
+
+  // Resposta ao modal de biometria pós-login
+  const handleBiometricPromptYes = () => {
+    if (pendingLoginCredentials) {
+      saveBiometricCredentials(pendingLoginCredentials.email, pendingLoginCredentials.password);
+      setBiometricSaved(true);
+    }
+    setShowBiometricPrompt(false);
+    setPendingLoginCredentials(null);
+    navigate("/escala", { replace: true });
+  };
+
+  const handleBiometricPromptNo = () => {
+    setShowBiometricPrompt(false);
+    setPendingLoginCredentials(null);
+    navigate("/escala", { replace: true });
+  };
+
+  const handleBiometricLogin = async () => {
+    setError(null);
+    setLoading(true);
+    try {
+      const creds = loadBiometricCredentials();
+      if (!creds) {
+        setError("Nenhuma credencial biométrica salva. Faça login com e-mail e senha primeiro.");
+        setLoading(false);
+        return;
+      }
+      const authenticated = await requestBiometricAuth();
+      if (!authenticated) {
+        setError("Autenticação biométrica cancelada ou falhou.");
+        setLoading(false);
+        return;
+      }
+      await handleLogin(creds.email, creds.password);
+    } catch {
+      setError("Erro ao autenticar com biometria.");
       setLoading(false);
     }
   };
-
-  // ---------------- RESET DE SENHA (TELA SEPARADA) ----------------
 
   const handleResetPassword = async () => {
-    if (!resetEmail.trim()) {
-      setError("Informe o e-mail para redefinir a senha.");
-      return;
-    }
-
+    if (!resetEmail.trim()) { setError("Informe o e-mail para redefinir a senha."); return; }
     setLoading(true);
-    setError(null);
-
     try {
-      const { data, error } = await supabase.functions.invoke(
-        "reset-password",
-        {
-          method: "POST",
-          body: { email: resetEmail.trim() },
-        }
-      );
-
-      if (error || (data as any)?.error) {
-        setError((data as any)?.error || "Não foi possível redefinir a senha.");
-        setLoading(false);
-        return;
-      }
-
-      setError("Senha redefinida com sucesso! Use a senha: 123456 para entrar.");
-      setResetEmail("");
-      setLoading(false);
-      setMode("login");
-    } catch (err) {
-      console.error(err);
-      setError("Erro inesperado ao redefinir a senha.");
-      setLoading(false);
-    }
+      const { data, error } = await supabase.functions.invoke("reset-password", { method: "POST", body: { email: resetEmail.trim() } });
+      if (error || (data as any)?.error) { setError((data as any)?.error || "Não foi possível redefinir a senha."); setLoading(false); return; }
+      setError("Senha redefinida! Use a senha: 123456 para entrar.");
+      setResetEmail(""); setLoading(false); setMode("login");
+    } catch { setError("Erro inesperado ao redefinir a senha."); setLoading(false); }
   };
-
-  // ---------------- TROCA DE SENHA OBRIGATÓRIA ----------------
 
   const handleChangePassword = async () => {
-    if (!pendingUserId) {
-      setError("Não foi possível identificar o usuário. Faça login novamente.");
-      return;
-    }
-
-    if (!newPassword || newPassword.length < 6) {
-      setError("A nova senha deve ter pelo menos 6 caracteres.");
-      return;
-    }
-
-    if (newPassword !== confirmNewPassword) {
-      setError("As senhas não conferem.");
-      return;
-    }
-
+    if (!pendingUserId) { setError("Não foi possível identificar o usuário. Faça login novamente."); return; }
+    if (!newPassword || newPassword.length < 6) { setError("A nova senha deve ter pelo menos 6 caracteres."); return; }
+    if (newPassword !== confirmNewPassword) { setError("As senhas não conferem."); return; }
     setLoading(true);
-    setError(null);
-
     try {
-      const { error: updErr } = await supabase.auth.updateUser({
-        password: newPassword,
-      });
-
-      if (updErr) {
-        console.error(updErr);
-        setError("Erro ao atualizar a senha.");
-        setLoading(false);
-        return;
-      }
-
-      await supabase
-        .from("ministers")
-        .update({ must_reset_password: false })
-        .eq("user_id", pendingUserId);
-
-      setMode("login");
-      setLoading(false);
+      const { error: updErr } = await supabase.auth.updateUser({ password: newPassword });
+      if (updErr) { setError("Erro ao atualizar a senha."); setLoading(false); return; }
+      await supabase.from("ministers").update({ must_reset_password: false }).eq("user_id", pendingUserId);
+      setMode("login"); setLoading(false);
       navigate("/escala", { replace: true });
-    } catch (err) {
-      console.error(err);
-      setError("Erro inesperado ao trocar a senha.");
-      setLoading(false);
-    }
+    } catch { setError("Erro inesperado ao trocar a senha."); setLoading(false); }
   };
-
-  // ---------------- CADASTRO COM CÓDIGO ----------------
 
   const handleRegister = async () => {
-  if (!regCode.trim() || !regName.trim() || !regEmail.trim()) {
-    setError("Preencha código, nome e e-mail.");
-    return;
-  }
-
-  if (!regBirthDate) {
-    setError("A data de aniversário é obrigatória.");
-    return;
-  }
-
-  // cria variável auxiliar para normalizar email
-  const normalizedEmail = regEmail.trim().toLowerCase();
-
-  if (!regPassword || regPassword.length < 6) {
-    setError("A senha deve ter pelo menos 6 caracteres.");
-    return;
-  }
-
-  // impede cadastro com e-mail já existente
-  const { data: existing } = await supabase
-    .from("ministers")
-    .select("id")
-    .eq("email", normalizedEmail)
-    .maybeSingle();
-
-  if (existing) {
-    setError("Este e-mail já está cadastrado no sistema.");
-    setLoading(false);
-    return;
-  }
-
-  if (regPassword !== regPassword2) {
-    setError("As senhas não conferem.");
-    return;
-  }
-
-  setLoading(true);
-  setError(null);
-
-  try {
-    const { data, error } = await supabase.functions.invoke(
-      "register-with-code",
-      {
-        body: {
-          code: regCode.trim(),
-          name: regName.trim(),
-          email: normalizedEmail, // já em lowercase
-          phone: regPhone.trim() || null,
-          birth_date: regBirthDate || null,
-          password: regPassword,
-        },
-      }
-    );
-
-    if (error || (data as any)?.error) {
-      console.error(error || (data as any)?.error);
-      setError(
-        (data as any)?.error || "Não foi possível concluir o cadastro."
-      );
+    if (!regCode.trim() || !regName.trim() || !regEmail.trim()) { setError("Preencha código, nome e e-mail."); return; }
+    if (!regBirthDate) { setError("A data de aniversário é obrigatória."); return; }
+    const normalizedEmail = regEmail.trim().toLowerCase();
+    if (!regPassword || regPassword.length < 6) { setError("A senha deve ter pelo menos 6 caracteres."); return; }
+    const { data: existing } = await supabase.from("ministers").select("id").eq("email", normalizedEmail).maybeSingle();
+    if (existing) { setError("Este e-mail já está cadastrado no sistema."); return; }
+    if (regPassword !== regPassword2) { setError("As senhas não conferem."); return; }
+    setLoading(true); setError(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("register-with-code", {
+        body: { code: regCode.trim(), name: regName.trim(), email: normalizedEmail, phone: regPhone.trim() || null, birth_date: regBirthDate || null, password: regPassword },
+      });
+      if (error || (data as any)?.error) { setError((data as any)?.error || "Não foi possível concluir o cadastro."); setLoading(false); return; }
+      setMode("login"); setEmail(normalizedEmail); setPassword("");
+      setRegCode(""); setRegName(""); setRegEmail(""); setRegPhone(""); setRegPassword(""); setRegPassword2("");
+      setError("Cadastro realizado com sucesso!");
       setLoading(false);
-      return;
-    }
-
-    // coloca o e-mail normalizado no campo de login após cadastro
-    setMode("login");
-    setEmail(normalizedEmail);
-    setPassword("");
-
-    setRegCode("");
-    setRegName("");
-    setRegEmail("");
-    setRegPhone("");
-    setRegPassword("");
-    setRegPassword2("");
-
-    setError("Cadastro realizado com sucesso!");
-    setLoading(false);
-  } catch (err) {
-    console.error(err);
-    setError("Erro inesperado ao realizar cadastro.");
-    setLoading(false);
-  }
-};
-
-  // ---------------- UI HELPERS ----------------
-
-  const renderTitle = () => {
-    if (isChangeMode) return "Defina sua nova senha";
-    if (isRegisterMode) return "Cadastro com código";
-    if (isForgot) return "Redefinir senha";
-    return "Acesso restrito";
+    } catch { setError("Erro inesperado ao realizar cadastro."); setLoading(false); }
   };
 
-  const submitLabel = () => {
-    if (loading) {
-      if (isChangeMode) return "Salvando...";
-      if (isRegisterMode) return "Cadastrando...";
-      if (isForgot) return "Enviando...";
-      return "Entrando...";
-    }
-    if (isChangeMode) return "Salvar nova senha";
-    if (isRegisterMode) return "Cadastrar";
-    if (isForgot) return "Enviar redefinição";
-    return "Entrar";
-  };
-
-  const isSuccess = error?.toLowerCase().includes("sucesso");
-
-  // ---------------- RENDER ----------------
+  const isChangeMode = mode === "changePassword";
+  const isRegisterMode = mode === "register";
+  const isForgot = mode === "forgotPassword";
+  const isSuccess = error?.toLowerCase().includes("sucesso") || error?.toLowerCase().includes("redefinida");
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center px-4">
-      <div className="bg-white rounded-xl shadow-md p-6 w-full max-w-sm border border-[#D6E6F7]">
-        <img
-          src="/brasao.png"
-          alt="Brasão"
-          className="mx-auto mb-3 h-[4cm] w-auto"
-        />
+    <div className="min-h-screen bg-gradient-to-br from-[#EEF4FF] via-[#F8FAFF] to-[#E8F0FE] flex items-center justify-center px-4 py-8">
+      <div className="w-full max-w-sm">
 
-        <h1 className="text-center text-[#4A6FA5] font-semibold text-[10px] mb-1">
-          ESCALA DE MINISTROS EXTRAORDINÁRIOS DA DISTRIBUIÇÃO DA EUCARISTIA
-        </h1>
+        {/* Card principal */}
+        <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
 
-        <h2 className="text-center text-gray-700 text-[9px] mb-4">
-          {renderTitle()}
-        </h2>
-
-        {!isChangeMode && !isForgot && (
-          <div className="flex mb-3 text-[10px] border-b border-gray-200">
-            <button
-              type="button"
-              className={`flex-1 py-1 text-center ${
-                mode === "login"
-                  ? "text-[#4A6FA5] border-b-2 border-[#4A6FA5] font-semibold"
-                  : "text-gray-500"
-              }`}
-              onClick={() => {
-                setMode("login");
-                setError(null);
-              }}
-            >
-              Entrar
-            </button>
-
-            <button
-              type="button"
-              className={`flex-1 py-1 text-center ${
-                mode === "register"
-                  ? "text-[#4A6FA5] border-b-2 border-[#4A6FA5] font-semibold"
-                  : "text-gray-500"
-              }`}
-              onClick={() => {
-                setMode("register");
-                setError(null);
-              }}
-            >
-              Cadastro com código
-            </button>
+          {/* Topo colorido */}
+          <div className="bg-gradient-to-r from-[#1E3A6E] to-[#4A6FA5] px-6 py-7 text-center">
+            <img src="/brasao.png" alt="Brasão" className="mx-auto h-16 w-auto mb-3 drop-shadow-md" />
+            <h1 className="text-white font-bold text-base leading-snug">
+              Escala de Ministros<br />da Eucaristia
+            </h1>
+            <p className="text-blue-200 text-xs mt-1">Paróquia Nossa Senhora das Graças</p>
           </div>
-        )}
 
-        {error && (
-          <div
-            className={`mb-3 text-[10px] px-2 py-1.5 rounded border ${
-              isSuccess
-                ? "text-green-700 bg-green-50 border-green-200"
-                : "text-red-600 bg-red-50 border-red-200"
-            }`}
-          >
-            {error}
-          </div>
-        )}
+          <div className="px-6 py-5">
 
-        <form onSubmit={handleSubmit} className="space-y-3">
-          {/* LOGIN */}
-          {mode === "login" && !isChangeMode && !isRegisterMode && (
-            <>
-              <div>
-                <label className="block text-[10px] text-gray-600 mb-1">
-                  E-mail
-                </label>
-                <input
-                  type="email"
-                  className="w-full border rounded px-2 py-1 text-sm"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
+            {/* Abas login/cadastro */}
+            {!isChangeMode && !isForgot && (
+              <div className="flex bg-gray-100 rounded-xl p-1 mb-5">
+                {[
+                  { key: "login", label: "Entrar" },
+                  { key: "register", label: "Cadastrar" },
+                ].map((tab) => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => { setMode(tab.key as Mode); setError(null); }}
+                    className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all ${
+                      mode === tab.key
+                        ? "bg-white text-[#4A6FA5] shadow-sm font-semibold"
+                        : "text-gray-500 hover:text-gray-700"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
               </div>
+            )}
 
-              <div>
-                <label className="block text-[10px] text-gray-600 mb-1">
-                  Senha
-                </label>
-                <input
-                  type="password"
-                  className="w-full border rounded px-2 py-1 text-sm"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
+            {/* Título para modos especiais */}
+            {(isChangeMode || isForgot) && (
+              <div className="text-center mb-5">
+                <h2 className="text-base font-bold text-[#1E3A6E]">
+                  {isChangeMode ? "Defina sua nova senha" : "Redefinir senha"}
+                </h2>
+                <p className="text-xs text-gray-500 mt-1">
+                  {isChangeMode ? "Esta é sua primeira vez. Crie uma senha segura." : "Informe o e-mail cadastrado."}
+                </p>
               </div>
+            )}
 
-              <div className="flex justify-between items-center">
-                <label className="text-[9px] text-gray-600 flex items-center gap-1">
-                  <input
-                    type="checkbox"
-                    checked={rememberMe}
-                    onChange={(e) => setRememberMe(e.target.checked)}
-                  />
-                  Permanecer conectado
-                </label>
-
-                <button
-                  type="button"
-                  className="text-[10px] text-blue-600 underline"
-                  onClick={() => {
-                    setMode("forgotPassword");
-                    setError(null);
-                    setResetEmail(email);
-                  }}
-                >
-                  Esqueci minha senha
-                </button>
+            {/* Mensagem de erro/sucesso */}
+            {error && (
+              <div className={`mb-4 px-3 py-2.5 rounded-xl text-sm border ${
+                isSuccess
+                  ? "text-green-700 bg-green-50 border-green-200"
+                  : "text-red-600 bg-red-50 border-red-200"
+              }`}>
+                {error}
               </div>
-            </>
-          )}
+            )}
 
-          {/* TROCA DE SENHA */}
-          {isChangeMode && (
-            <>
-              <div>
-                <label className="block text-[10px]">Nova senha</label>
-                <input
-                  type="password"
-                  className="w-full border rounded px-2 py-1 text-sm"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                />
-              </div>
+            <form onSubmit={handleSubmit} className="space-y-3.5">
 
-              <div>
-                <label className="block text-[10px]">Repita a nova senha</label>
-                <input
-                  type="password"
-                  className="w-full border rounded px-2 py-1 text-sm"
-                  value={confirmNewPassword}
-                  onChange={(e) => setConfirmNewPassword(e.target.value)}
-                />
-              </div>
-            </>
-          )}
+              {/* LOGIN */}
+              {mode === "login" && (
+                <>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5">E-mail</label>
+                    <input
+                      type="email"
+                      className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:border-[#4A6FA5] focus:outline-none transition-colors"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="seu@email.com"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5">Senha</label>
+                    <input
+                      type="password"
+                      className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:border-[#4A6FA5] focus:outline-none transition-colors"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                    />
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                      <input type="checkbox" checked={rememberMe} onChange={(e) => { setRememberMeState(e.target.checked); setRememberMe(e.target.checked); }} className="w-3.5 h-3.5 accent-[#4A6FA5]" />
+                      Permanecer conectado
+                    </label>
+                    <button type="button" className="text-xs text-[#4A6FA5] hover:underline font-medium"
+                      onClick={() => { setMode("forgotPassword"); setError(null); setResetEmail(email); }}>
+                      Esqueci a senha
+                    </button>
+                  </div>
+                  {/* Botão de login biométrico se já tem credenciais salvas */}
+                  {biometricSaved && (
+                    <button
+                      type="button"
+                      onClick={handleBiometricLogin}
+                      disabled={loading}
+                      className="w-full py-2.5 text-sm font-bold rounded-xl border-2 border-[#4A6FA5] text-[#4A6FA5] hover:bg-[#EEF4FF] disabled:opacity-60 transition-all flex items-center justify-center gap-2"
+                    >
+                      <span className="text-lg">🔐</span>
+                      Entrar com {getBiometricLabel()}
+                    </button>
+                  )}
+                </>
+              )}
 
-          {/* ESQUECI MINHA SENHA */}
-          {isForgot && (
-            <>
-              <div>
-                <label className="block text-[10px]">E-mail cadastrado</label>
-                <input
-                  type="email"
-                  className="w-full border rounded px-2 py-1 text-sm"
-                  value={resetEmail}
-                  onChange={(e) => setResetEmail(e.target.value)}
-                />
-              </div>
+              {/* TROCAR SENHA */}
+              {isChangeMode && (
+                <>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5">Nova senha</label>
+                    <input type="password" className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:border-[#4A6FA5] focus:outline-none" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Mínimo 6 caracteres" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5">Confirmar senha</label>
+                    <input type="password" className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:border-[#4A6FA5] focus:outline-none" value={confirmNewPassword} onChange={(e) => setConfirmNewPassword(e.target.value)} placeholder="Repita a nova senha" />
+                  </div>
+                </>
+              )}
+
+              {/* ESQUECI SENHA */}
+              {isForgot && (
+                <>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5">E-mail cadastrado</label>
+                    <input type="email" className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:border-[#4A6FA5] focus:outline-none" value={resetEmail} onChange={(e) => setResetEmail(e.target.value)} placeholder="seu@email.com" />
+                  </div>
+                  <button type="button" className="text-xs text-[#4A6FA5] hover:underline" onClick={() => { setMode("login"); setError(null); }}>
+                    ← Voltar ao login
+                  </button>
+                </>
+              )}
+
+              {/* CADASTRO */}
+              {isRegisterMode && (
+                <>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5">Código de acesso *</label>
+                    <input className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:border-[#4A6FA5] focus:outline-none" value={regCode} onChange={(e) => setRegCode(e.target.value)} placeholder="Código fornecido pela coordenação" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5">Nome completo *</label>
+                    <input className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:border-[#4A6FA5] focus:outline-none" value={regName} onChange={(e) => setRegName(e.target.value)} placeholder="Seu nome completo" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5">E-mail *</label>
+                    <input type="email" className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:border-[#4A6FA5] focus:outline-none" value={regEmail} onChange={(e) => setRegEmail(e.target.value)} placeholder="seu@email.com" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5">Data de aniversário *</label>
+                    <input type="date" className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:border-[#4A6FA5] focus:outline-none" value={regBirthDate} onChange={(e) => setRegBirthDate(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5">Telefone (opcional)</label>
+                    <input className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:border-[#4A6FA5] focus:outline-none" value={regPhone} onChange={(e) => setRegPhone(e.target.value)} placeholder="(00) 00000-0000" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-600 mb-1.5">Senha *</label>
+                      <input type="password" className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:border-[#4A6FA5] focus:outline-none" value={regPassword} onChange={(e) => setRegPassword(e.target.value)} placeholder="Mín. 6 car." />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-600 mb-1.5">Confirmar *</label>
+                      <input type="password" className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:border-[#4A6FA5] focus:outline-none" value={regPassword2} onChange={(e) => setRegPassword2(e.target.value)} placeholder="Repita" />
+                    </div>
+                  </div>
+                </>
+              )}
 
               <button
-                type="button"
-                className="text-[10px] text-blue-600 underline"
-                onClick={() => {
-                  setMode("login");
-                  setError(null);
-                }}
+                type="submit"
+                disabled={loading}
+                className="w-full mt-1 py-3 text-sm font-bold rounded-xl bg-gradient-to-r from-[#2756A3] to-[#4A6FA5] text-white hover:from-[#1E3A6E] hover:to-[#2756A3] disabled:opacity-60 transition-all shadow-md shadow-blue-100"
               >
-                Voltar ao login
+                {loading
+                  ? "Aguarde..."
+                  : isChangeMode ? "Salvar nova senha"
+                  : isRegisterMode ? "Cadastrar"
+                  : isForgot ? "Enviar redefinição"
+                  : "Entrar"}
               </button>
-            </>
-          )}
+            </form>
+          </div>
+        </div>
 
-          {/* CADASTRO COM CÓDIGO */}
-          {isRegisterMode && !isChangeMode && !isForgot && (
-            <>
-              <div>
-                <label className="block text-[10px]">Código *</label>
-                <input
-                  className="w-full border rounded px-2 py-1 text-sm"
-                  value={regCode}
-                  onChange={(e) => setRegCode(e.target.value)}
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px]">Nome completo *</label>
-                <input
-                  className="w-full border rounded px-2 py-1 text-sm"
-                  value={regName}
-                  onChange={(e) => setRegName(e.target.value)}
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px]">E-mail *</label>
-                <input
-                  type="email"
-                  className="w-full border rounded px-2 py-1 text-sm"
-                  value={regEmail}
-                  onChange={(e) => setRegEmail(e.target.value)}
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px]">Data de aniversário *</label>
-                <input
-                  type="date"
-                  className="w-full border rounded px-2 py-1 text-sm"
-                  value={regBirthDate}
-                  onChange={(e) => setRegBirthDate(e.target.value)}
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px]">Telefone (opcional)</label>
-                <input
-                  className="w-full border rounded px-2 py-1 text-sm"
-                  value={regPhone}
-                  onChange={(e) => setRegPhone(e.target.value)}
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px]">Senha *</label>
-                <input
-                  type="password"
-                  className="w-full border rounded px-2 py-1 text-sm"
-                  value={regPassword}
-                  onChange={(e) => setRegPassword(e.target.value)}
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px]">Repita a senha *</label>
-                <input
-                  type="password"
-                  className="w-full border rounded px-2 py-1 text-sm"
-                  value={regPassword2}
-                  onChange={(e) => setRegPassword2(e.target.value)}
-                />
-              </div>
-            </>
-          )}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full mt-1 py-1.5 text-sm rounded bg-[#4A6FA5] text-white hover:bg-[#3F5F8F]"
-          >
-            {submitLabel()}
-          </button>
-        </form>
+        <p className="text-center text-xs text-gray-400 mt-4">
+          © 2025 Paróquia Nossa Senhora das Graças · v3.0
+        </p>
       </div>
+
+      {/* Modal pós-login: perguntar sobre biometria */}
+      {showBiometricPrompt && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-lg max-w-xs w-full p-5">
+            <p className="text-sm text-gray-700 text-center">
+              Deseja usar <span className="font-semibold">{getBiometricLabel()}</span> para acessar o sistema?
+            </p>
+            <div className="flex gap-2 mt-4">
+              <button
+                onClick={handleBiometricPromptNo}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-gray-500 text-sm font-medium hover:bg-gray-50"
+              >
+                Não
+              </button>
+              <button
+                onClick={handleBiometricPromptYes}
+                className="flex-1 py-2.5 rounded-xl bg-[#4A6FA5] text-white text-sm font-semibold"
+              >
+                Sim
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -232,8 +232,8 @@ function ExtrasInner() {
   // -------------------------------------------------------
   if (loading) {
     return (
-      <div className="max-w-5xl mx-auto">
-        <h2 className="text-lg font-semibold text-[#4A6FA5] mb-3">Missas Solenes</h2>
+      <div className="max-w-2xl mx-auto">
+        <h2 className="text-xl font-bold text-[#4A6FA5] mb-3">Missas Solenes</h2>
         <p className="text-sm text-gray-600">Carregando...</p>
       </div>
     );
@@ -244,83 +244,46 @@ function ExtrasInner() {
   // ===========================================================
 
   return (
-    <div className="max-w-5xl mx-auto">
-      <h2 className="text-lg font-semibold text-[#4A6FA5] mb-1">Missas Solenes</h2>
-      <p className="text-[11px] text-gray-700 mb-3">
-        Cadastre aqui celebrações de solenidade.
-      </p>
+    <div className="max-w-2xl mx-auto">
+      <h2 className="text-xl font-bold text-[#1E3A6E] mb-1">Missas Solenes</h2>
+      <p className="text-sm text-gray-500 mb-4">Gerencie celebrações especiais.</p>
 
-      {/* ============================
-          SELETOR IGUAL DISPONIBILIDADE
-      ============================ */}
-      <div className="flex items-center gap-2 mb-4">
-
-        {/* SELECT MÊS */}
-        <select
-          className="border rounded px-2 py-1 text-[10px]"
-          value={month}
-          onChange={(e) => setMonth(Number(e.target.value))}
-        >
-          {MONTH_NAMES.map((name, idx) => (
-            <option key={idx} value={idx}>
-              {name}
-            </option>
-          ))}
+      {/* Seletor de mês */}
+      <div className="flex gap-1.5 mb-4">
+        <select className="flex-1 border-2 border-gray-200 rounded-xl px-3 py-2 text-sm font-medium focus:border-[#4A6FA5] focus:outline-none" value={month} onChange={(e) => setMonth(Number(e.target.value))}>
+          {MONTH_NAMES.map((name, idx) => <option key={idx} value={idx}>{name}</option>)}
         </select>
-
-        {/* SELECT ANO */}
-        <select
-          className="border rounded px-2 py-1 text-[10px] w-20"
-          value={year}
-          onChange={(e) => setYear(Number(e.target.value))}
-        >
-          {Array.from({ length: 10 }).map((_, i) => {
-            const y = new Date().getFullYear() - 2 + i;
-            return (
-              <option key={y} value={y}>
-                {y}
-              </option>
-            );
-          })}
+        <select className="w-20 border-2 border-gray-200 rounded-xl px-2 py-2 text-sm font-medium focus:border-[#4A6FA5] focus:outline-none" value={year} onChange={(e) => setYear(Number(e.target.value))}>
+          {Array.from({ length: 10 }).map((_, i) => { const y = new Date().getFullYear() - 2 + i; return <option key={y} value={y}>{y}</option>; })}
         </select>
+        {isAdmin && (
+          <button onClick={() => { setShowNewModal(true); setError(null); }} className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#2756A3] to-[#4A6FA5] text-white text-sm font-bold flex-shrink-0">
+            + Nova
+          </button>
+        )}
       </div>
 
       {/* ERROS */}
       {error && (
-        <div className="mb-3 text-sm text-red-600 bg-red-50 border border-red-200 px-3 py-2 rounded">
+        <div className="mb-3 text-sm text-red-600 bg-red-50 border-2 border-red-200 px-3 py-2 rounded-lg">
           {error}
-        </div>
-      )}
-
-      {/* Botão criar */}
-      {isAdmin && (
-        <div className="flex justify-end mb-3">
-          <button
-            onClick={() => {
-              setShowNewModal(true);
-              setError(null);
-            }}
-            className="px-3 py-1.5 text-xs rounded bg-[#4A6FA5] text-white hover:bg-[#3F5F8F]"
-          >
-            Nova Missa Solene
-          </button>
         </div>
       )}
 
       {/* ====================
           TABELA DO MÊS SELECIONADO
       ==================== */}
-      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-        <div className="px-3 py-2 bg-[#D6E6F7] text-[10px] text-[#3F5F8F] font-semibold">
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="px-4 py-3 bg-gradient-to-r from-[#EEF4FF] to-[#F8FAFF] text-sm font-bold text-[#1E3A6E] border-b border-[#D6E6F7]">
           Missas extras — {MONTH_NAMES[month]} / {year}
         </div>
 
         {filtered.length === 0 ? (
-          <div className="px-3 py-2 text-[10px] text-gray-500">
+          <div className="px-3 py-2 text-sm text-gray-500">
             Nenhuma missa extra cadastrada neste mês.
           </div>
         ) : (
-          <table className="min-w-full text-[10px]">
+          <table className="min-w-full text-sm">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-2 py-1 text-left">Data</th>
@@ -359,7 +322,7 @@ function ExtrasInner() {
                       <td className="px-2 py-1 text-center">
                         <button
                           onClick={() => openEdit(e)}
-                          className="px-2 py-0.5 border rounded text-[9px] hover:bg-gray-50"
+                          className="px-3 py-1 border-2 rounded-lg text-xs font-medium hover:bg-gray-50"
                         >
                           Editar
                         </button>
@@ -385,7 +348,7 @@ function ExtrasInner() {
 
             <div className="space-y-2 mb-3">
               <div>
-                <label className="block text-[10px] text-gray-600 mb-1">Título *</label>
+                <label className="block text-sm text-gray-600 mb-1">Título *</label>
                 <input
                   type="text"
                   className="w-full border rounded px-2 py-1 text-sm"
@@ -395,7 +358,7 @@ function ExtrasInner() {
               </div>
 
               <div>
-                <label className="block text-[10px] text-gray-600 mb-1">Data *</label>
+                <label className="block text-sm text-gray-600 mb-1">Data *</label>
                 <input
                   type="date"
                   className="w-full border rounded px-2 py-1 text-sm"
@@ -405,7 +368,7 @@ function ExtrasInner() {
               </div>
 
               <div>
-                <label className="block text-[10px] text-gray-600 mb-1">Horário *</label>
+                <label className="block text-sm text-gray-600 mb-1">Horário *</label>
                 <input
                   type="time"
                   className="w-full border rounded px-2 py-1 text-sm"
@@ -416,7 +379,7 @@ function ExtrasInner() {
 
               <div className="flex gap-2">
                 <div className="flex-1">
-                  <label className="block text-[10px] text-gray-600 mb-1">
+                  <label className="block text-sm text-gray-600 mb-1">
                     Mínimo
                   </label>
                   <input
@@ -428,7 +391,7 @@ function ExtrasInner() {
                 </div>
 
                 <div className="flex-1">
-                  <label className="block text-[10px] text-gray-600 mb-1">
+                  <label className="block text-sm text-gray-600 mb-1">
                     Máximo
                   </label>
                   <input
@@ -444,7 +407,7 @@ function ExtrasInner() {
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => setShowNewModal(false)}
-                className="px-3 py-1 text-[10px] rounded border border-gray-300 hover:bg-gray-50"
+                className="px-3 py-1 text-sm rounded border border-gray-300 hover:bg-gray-50"
                 disabled={saving}
               >
                 Cancelar
@@ -452,7 +415,7 @@ function ExtrasInner() {
 
               <button
                 onClick={handleCreate}
-                className="px-3 py-1 text-[10px] rounded bg-[#4A6FA5] text-white hover:bg-[#3F5F8F] disabled:opacity-60"
+                className="px-3 py-1 text-sm rounded bg-[#4A6FA5] text-white hover:bg-[#3F5F8F] disabled:opacity-60"
                 disabled={saving}
               >
                 {saving ? "Salvando..." : "Salvar"}
@@ -474,7 +437,7 @@ function ExtrasInner() {
 
             <div className="space-y-2 mb-3">
               <div>
-                <label className="block text-[10px] text-gray-600 mb-1">Título *</label>
+                <label className="block text-sm text-gray-600 mb-1">Título *</label>
                 <input
                   type="text"
                   className="w-full border rounded px-2 py-1 text-sm"
@@ -484,7 +447,7 @@ function ExtrasInner() {
               </div>
 
               <div>
-                <label className="block text-[10px] text-gray-600 mb-1">Data *</label>
+                <label className="block text-sm text-gray-600 mb-1">Data *</label>
                 <input
                   type="date"
                   className="w-full border rounded px-2 py-1 text-sm"
@@ -494,7 +457,7 @@ function ExtrasInner() {
               </div>
 
               <div>
-                <label className="block text-[10px] text-gray-600 mb-1">Horário *</label>
+                <label className="block text-sm text-gray-600 mb-1">Horário *</label>
                 <input
                   type="time"
                   className="w-full border rounded px-2 py-1 text-sm"
@@ -505,7 +468,7 @@ function ExtrasInner() {
 
               <div className="flex gap-2">
                 <div className="flex-1">
-                  <label className="block text-[10px] text-gray-600 mb-1">
+                  <label className="block text-sm text-gray-600 mb-1">
                     Mínimo
                   </label>
                   <input
@@ -517,7 +480,7 @@ function ExtrasInner() {
                 </div>
 
                 <div className="flex-1">
-                  <label className="block text-[10px] text-gray-600 mb-1">
+                  <label className="block text-sm text-gray-600 mb-1">
                     Máximo
                   </label>
                   <input
@@ -529,7 +492,7 @@ function ExtrasInner() {
                 </div>
               </div>
 
-              <label className="flex items-center gap-1 text-[10px] text-gray-700">
+              <label className="flex items-center gap-1 text-sm text-gray-700">
                 <input
                   type="checkbox"
                   checked={editActive}
@@ -542,7 +505,7 @@ function ExtrasInner() {
             <div className="flex justify-between items-center gap-2">
               <button
                 onClick={handleDelete}
-                className="px-2 py-1 text-[9px] rounded border border-red-300 text-red-600 hover:bg-red-50"
+                className="px-3 py-2 text-sm rounded-lg border border-red-300 text-red-600 hover:bg-red-50 font-medium"
                 disabled={saving}
               >
                 Excluir
@@ -554,7 +517,7 @@ function ExtrasInner() {
                     setShowEditModal(false);
                     setEditExtra(null);
                   }}
-                  className="px-3 py-1 text-[10px] rounded border border-gray-300 hover:bg-gray-50"
+                  className="px-3 py-1 text-sm rounded border border-gray-300 hover:bg-gray-50"
                   disabled={saving}
                 >
                   Cancelar
@@ -562,7 +525,7 @@ function ExtrasInner() {
 
                 <button
                   onClick={handleEditSave}
-                  className="px-3 py-1 text-[10px] rounded bg-[#4A6FA5] text-white hover:bg-[#3F5F8F] disabled:opacity-60"
+                  className="px-3 py-1 text-sm rounded bg-[#4A6FA5] text-white hover:bg-[#3F5F8F] disabled:opacity-60"
                   disabled={saving}
                 >
                   {saving ? "Salvando..." : "Salvar"}

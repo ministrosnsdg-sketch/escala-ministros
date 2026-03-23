@@ -230,7 +230,7 @@ export default function DisponibilidadeJanelaConfig() {
 
   if (!isAdmin) {
     return (
-      <p className="text-[10px] text-gray-600">
+      <p className="text-sm text-gray-600">
         Apenas administradores podem configurar a janela de disponibilidade.
       </p>
     );
@@ -238,7 +238,7 @@ export default function DisponibilidadeJanelaConfig() {
 
   return (
     <section className="space-y-3">
-      <div className="bg-[#F7FAFF] border border-[#D6E6F7] rounded-xl px-3 py-2 text-[9px] text-[#3F5F8F]">
+      <div className="bg-[#F0F4FA] border border-[#D6E6F7] rounded-2xl px-4 py-3 text-sm text-[#3F5F8F]">
         <p>
           Configure a abertura padrão e faça liberações manuais por mês (vigente
           ou seguinte). As liberações manuais têm data de início e fim.
@@ -246,31 +246,31 @@ export default function DisponibilidadeJanelaConfig() {
       </div>
 
       {loading ? (
-        <p className="text-[10px] text-gray-600">Carregando...</p>
+        <p className="text-sm text-gray-600">Carregando...</p>
       ) : (
         <>
           {error && (
-            <div className="text-[10px] text-red-600 bg-red-50 border border-red-200 px-3 py-2 rounded">
+            <div className="text-sm text-red-600 bg-red-50 border-2 border-red-200 px-3 py-2 rounded-lg">
               {error}
             </div>
           )}
           {message && (
-            <div className="text-[10px] text-green-700 bg-green-50 border border-green-200 px-3 py-2 rounded">
+            <div className="text-sm text-green-700 bg-green-50 border border-green-200 px-3 py-2 rounded">
               {message}
             </div>
           )}
 
           {/* Configuração padrão */}
-          <div className="bg-white border border-gray-200 rounded-xl p-3 space-y-3 text-[9px]">
+          <div className="bg-white border-2 border-gray-200 rounded-xl p-3 space-y-3 shadow-sm">
             <div className="flex flex-col sm:flex-row gap-3">
               <div className="flex-1">
-                <label className="block text-[9px] text-gray-700 mb-1">
+                <label className="block text-sm text-gray-700 mb-1 font-medium">
                   Dias antes do próximo mês para abrir o preenchimento
                 </label>
                 <input
                   type="number"
                   min={1}
-                  className="w-full border rounded px-2 py-1 text-[10px]"
+                  className="w-full border rounded px-2 py-1 text-sm"
                   value={daysBefore}
                   onChange={(e) =>
                     setDaysBefore(Math.max(1, Number(e.target.value) || 1))
@@ -285,7 +285,7 @@ export default function DisponibilidadeJanelaConfig() {
                   checked={hardClose}
                   onChange={(e) => setHardClose(e.target.checked)}
                 />
-                <label htmlFor="hardClose" className="text-[9px] text-gray-700">
+                <label htmlFor="hardClose" className="text-xs text-gray-700">
                   Encerrar totalmente a edição após o prazo
                 </label>
               </div>
@@ -295,7 +295,7 @@ export default function DisponibilidadeJanelaConfig() {
               <button
                 onClick={save}
                 disabled={saving}
-                className="px-3 py-1.5 rounded-full bg-[#4A6FA5] text-white text-[9px] hover:bg-[#3F5F8F] disabled:opacity-60"
+                className="px-3 py-1.5 rounded-full bg-[#4A6FA5] text-white text-xs hover:bg-[#3F5F8F] disabled:opacity-60"
               >
                 {saving ? "Salvando..." : "Salvar configurações"}
               </button>
@@ -304,7 +304,7 @@ export default function DisponibilidadeJanelaConfig() {
               <button
                 onClick={liberarMesVigente}
                 disabled={saving}
-                className="px-3 py-1.5 rounded-full border border-[#4A6FA5] text-[#4A6FA5] text-[9px] hover:bg-[#E6EEF9] disabled:opacity-60"
+                className="px-3 py-1.5 rounded-full border border-[#4A6FA5] text-[#4A6FA5] text-xs hover:bg-[#E6EEF9] disabled:opacity-60"
               >
                 Liberar mês vigente
               </button>
@@ -312,7 +312,7 @@ export default function DisponibilidadeJanelaConfig() {
               <button
                 onClick={liberarMesSeguinte}
                 disabled={saving}
-                className="px-3 py-1.5 rounded-full border border-[#4A6FA5] text-[#4A6FA5] text-[9px] hover:bg-[#E6EEF9] disabled:opacity-60"
+                className="px-3 py-1.5 rounded-full border border-[#4A6FA5] text-[#4A6FA5] text-xs hover:bg-[#E6EEF9] disabled:opacity-60"
               >
                 Liberar mês seguinte
               </button>
@@ -320,17 +320,17 @@ export default function DisponibilidadeJanelaConfig() {
           </div>
 
           {/* Lista de liberações ativas */}
-          <div className="bg-white border border-gray-200 rounded-xl p-3 space-y-2 text-[9px]">
-            <div className="text-[10px] font-semibold text-[#3F5F8F]">
+          <div className="bg-white border-2 border-gray-200 rounded-xl p-3 space-y-2 shadow-sm">
+            <div className="text-sm font-semibold text-[#3F5F8F]">
               Liberações manuais ativas
             </div>
             {overrides.length === 0 ? (
-              <div className="text-[10px] text-gray-600">
+              <div className="text-sm text-gray-600">
                 Nenhuma liberação manual ativa.
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="min-w-full text-[10px]">
+                <table className="min-w-full text-sm">
                   <thead>
                     <tr className="text-left border-b">
                       <th className="py-1 pr-3">Mês/Ano</th>

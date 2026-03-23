@@ -223,13 +223,13 @@ export default function RelatorioDisponibilidade() {
 
   return (
     <section className="space-y-3">
-      <div className="flex flex-wrap gap-2 items-center text-[9px]">
+      <div className="flex flex-wrap gap-2 items-center text-xs">
         <div className="font-semibold text-[#4A6FA5]">
           Cobertura — {label}
         </div>
 
         <select
-          className="border rounded px-2 py-1 text-[9px]"
+          className="border rounded px-2 py-1 text-xs"
           value={month}
           onChange={(e) => setMonth(Number(e.target.value))}
         >
@@ -242,7 +242,7 @@ export default function RelatorioDisponibilidade() {
 
         <input
           type="number"
-          className="border rounded px-2 py-1 w-16 text-[9px]"
+          className="border rounded px-2 py-1 w-16 text-xs"
           value={year}
           onChange={(e) => {
             const v = Number(e.target.value);
@@ -252,7 +252,7 @@ export default function RelatorioDisponibilidade() {
 
         {/* NOVO FILTRO DE STATUS */}
         <select
-          className="border rounded px-2 py-1 text-[9px]"
+          className="border rounded px-2 py-1 text-xs"
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
         >
@@ -263,7 +263,7 @@ export default function RelatorioDisponibilidade() {
         </select>
       </div>
 
-      <div className="bg-[#F7FAFF] border border-[#D6E6F7] rounded-xl px-3 py-2 text-[9px] text-[#3F5F8F]">
+      <div className="bg-[#F0F4FA] border border-[#D6E6F7] rounded-2xl px-4 py-3 text-sm text-[#3F5F8F]">
         <p>
           Aqui você vê se cada missa atingiu o mínimo de ministros para o mês
           selecionado. Exibimos apenas números (sem nomes).
@@ -271,17 +271,18 @@ export default function RelatorioDisponibilidade() {
       </div>
 
       {loading ? (
-        <p className="text-[10px] text-gray-600">Carregando cobertura...</p>
+        <p className="text-sm text-gray-600">Carregando cobertura...</p>
       ) : error ? (
-        <p className="text-[10px] text-red-600">{error}</p>
+        <p className="text-sm text-red-600">{error}</p>
       ) : (
         <>
-          <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-            <div className="px-3 py-2 bg-[#D6E6F7] text-[10px] text-[#3F5F8F] font-semibold">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="px-4 py-3 bg-gradient-to-r from-[#EEF4FF] to-[#F8FAFF] text-sm font-bold text-[#1E3A6E] border-b border-[#D6E6F7]">
               Missas fixas
             </div>
 
-            <table className="min-w-full text-[9px]">
+            <div className="overflow-x-auto max-h-[60vh] overflow-y-auto">
+            <table className="min-w-full text-sm">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-2 py-1 text-left">Data</th>
@@ -331,15 +332,16 @@ export default function RelatorioDisponibilidade() {
                   })}
               </tbody>
             </table>
+            </div>
           </div>
 
-          <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-            <div className="px-3 py-2 bg-[#F2E3FF] text-[10px] text-[#5B3FA6] font-semibold">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="px-4 py-3 bg-gradient-to-r from-purple-50 to-white text-sm font-bold text-purple-700 border-b border-purple-100">
               Missas extras
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-[9px]">
+            <div className="overflow-x-auto max-h-[60vh] overflow-y-auto">
+              <table className="min-w-full text-sm">
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-2 py-1 text-left">Data</th>

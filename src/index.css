@@ -2,71 +2,76 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Configuração global */
+/* ─── BASE ─── */
 html {
   font-size: 16px;
-}
-
-:root {
-  color-scheme: light;
-  
-  /* Cores personalizadas */
-  --color-primary: #1e40af;
-  --color-primary-light: #3b82f6;
-  --color-primary-dark: #1e3a8a;
-  --color-secondary: #6366f1;
-  --color-accent: #8b5cf6;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
-  @apply bg-gray-50 text-gray-900;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  @apply bg-[#F0F4FA] text-gray-900;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Scrollbar personalizada */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
+/* ─── SCROLLBAR ─── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { @apply bg-gray-300 rounded-full; }
+::-webkit-scrollbar-thumb:hover { @apply bg-gray-400; }
 
-::-webkit-scrollbar-track {
-  @apply bg-gray-100;
-}
-
-::-webkit-scrollbar-thumb {
-  @apply bg-gray-400 rounded-full;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  @apply bg-gray-500;
-}
-
-/* Animações suaves */
-* {
-  @apply transition-colors duration-200;
-}
-
-/* Melhorias nos inputs */
+/* ─── INPUTS ─── */
 input, select, textarea {
-  @apply focus:ring-2 focus:ring-blue-500 focus:border-blue-500;
+  @apply focus:ring-0;
+  outline: none;
+}
+input[type="checkbox"], input[type="radio"] {
+  @apply accent-[#4A6FA5];
 }
 
-/* Botões melhorados */
+/* ─── BUTTONS ─── */
 button {
-  @apply transition-all duration-200;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+button:active:not(:disabled) {
+  transform: scale(0.97);
 }
 
-button:active {
-  @apply scale-95;
+/* ─── MOBILE SAFE AREA ─── */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
-/* Cards e containers */
-.card {
-  @apply bg-white rounded-lg shadow-sm border border-gray-200 p-6;
+/* ─── TABLES ─── */
+table { width: 100%; }
+th { @apply text-left text-xs font-semibold text-gray-500 uppercase tracking-wide; }
+tbody tr { @apply border-b border-gray-50; }
+tbody tr:last-child { border-bottom: none; }
+tbody tr:hover { @apply bg-gray-50/60; }
+td { @apply text-sm text-gray-700; }
+
+/* ─── TRANSITIONS ─── */
+*, *::before, *::after {
+  transition-property: color, background-color, border-color, opacity, box-shadow, transform;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
 }
 
-.card-hover {
-  @apply hover:shadow-md hover:border-gray-300;
+/* Override for elements that should not transition */
+.no-transition, .no-transition * {
+  transition: none !important;
+}
+
+/* ─── MODAL BACKDROP ─── */
+.modal-backdrop {
+  backdrop-filter: blur(2px);
+}
+
+/* ─── BOTTOM NAV SAFE AREA ─── */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .bottom-nav {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
 }

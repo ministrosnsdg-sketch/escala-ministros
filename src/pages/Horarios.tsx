@@ -199,8 +199,8 @@ function HorariosInner() {
 
   if (loading) {
     return (
-      <div className="max-w-5xl mx-auto">
-        <h2 className="text-lg font-semibold text-[#4A6FA5] mb-3">
+      <div className="max-w-2xl mx-auto">
+        <h2 className="text-xl font-bold text-[#4A6FA5] mb-3">
           Horários de Missa
         </h2>
         <p className="text-sm text-gray-600">Carregando horários...</p>
@@ -214,16 +214,12 @@ function HorariosInner() {
   }));
 
   return (
-    <div className="max-w-5xl mx-auto">
-      <h2 className="text-lg font-semibold text-[#4A6FA5] mb-1">
-        Horários de Missa - Fixos
-      </h2>
-      <p className="text-[11px] text-gray-700 mb-3">
-        Cadastre aqui os horários fixos de missa para cada dia da semana.
-      </p>
+    <div className="max-w-2xl mx-auto">
+      <h2 className="text-xl font-bold text-[#1E3A6E] mb-1">Horários de Missa</h2>
+      <p className="text-sm text-gray-500 mb-4">Horários fixos por dia da semana.</p>
 
       {error && (
-        <div className="mb-3 text-sm text-red-600 bg-red-50 border border-red-200 px-3 py-2 rounded">
+        <div className="mb-3 text-sm text-red-600 bg-red-50 border-2 border-red-200 px-3 py-2 rounded-lg">
           {error}
         </div>
       )}
@@ -235,7 +231,7 @@ function HorariosInner() {
               setShowNewModal(true);
               setError(null);
             }}
-            className="px-3 py-1.5 text-xs rounded bg-[#4A6FA5] text-white hover:bg-[#3F5F8F]"
+            className="px-4 py-2 text-sm rounded-lg bg-[#4A6FA5] text-white hover:bg-[#3F5F8F] font-medium"
           >
             Novo horário
           </button>
@@ -245,16 +241,16 @@ function HorariosInner() {
       <div className="space-y-3">
         {grouped.map((g) => (
           <div key={g.label} className="bg-white border border-gray-200 rounded-lg">
-            <div className="px-3 py-1.5 bg-[#D6E6F7] text-[10px] text-[#3F5F8F] font-semibold flex justify-between">
+            <div className="px-4 py-2.5 bg-gradient-to-r from-[#EEF4FF] to-[#F8FAFF] text-sm font-bold text-[#1E3A6E] flex justify-between items-center border-b border-[#D6E6F7]">
               <span>{g.label}</span>
               <span>{g.items.length} horário(s)</span>
             </div>
             {g.items.length === 0 ? (
-              <div className="px-3 py-2 text-[10px] text-gray-500">
+              <div className="px-4 py-4 text-sm text-gray-400 text-center">
                 Nenhum horário cadastrado.
               </div>
             ) : (
-              <table className="w-full text-[10px]">
+              <table className="w-full text-sm">
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-2 py-1 text-left">Horário</th>
@@ -283,7 +279,7 @@ function HorariosInner() {
                         <td className="px-2 py-1 text-center">
                           <button
                             onClick={() => openEdit(h)}
-                            className="px-2 py-0.5 border rounded text-[9px] hover:bg-gray-50"
+                            className="px-3 py-1 border-2 rounded-lg text-xs font-medium hover:bg-gray-50"
                           >
                             Editar
                           </button>
@@ -306,7 +302,7 @@ function HorariosInner() {
             </h3>
             <div className="space-y-2 mb-3">
               <div>
-                <label className="block text-[10px] text-gray-600 mb-1">
+                <label className="block text-sm text-gray-600 mb-1">
                   Dia da semana
                 </label>
                 <select
@@ -322,7 +318,7 @@ function HorariosInner() {
                 </select>
               </div>
               <div>
-                <label className="block text-[10px] text-gray-600 mb-1">
+                <label className="block text-sm text-gray-600 mb-1">
                   Horário
                 </label>
                 <input
@@ -334,7 +330,7 @@ function HorariosInner() {
               </div>
               <div className="flex gap-2">
                 <div className="flex-1">
-                  <label className="block text-[10px] text-gray-600 mb-1">
+                  <label className="block text-sm text-gray-600 mb-1">
                     Mínimo
                   </label>
                   <input
@@ -350,7 +346,7 @@ function HorariosInner() {
                   />
                 </div>
                 <div className="flex-1">
-                  <label className="block text-[10px] text-gray-600 mb-1">
+                  <label className="block text-sm text-gray-600 mb-1">
                     Máximo
                   </label>
                   <input
@@ -370,14 +366,14 @@ function HorariosInner() {
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => setShowNewModal(false)}
-                className="px-3 py-1 text-[10px] rounded border border-gray-300 hover:bg-gray-50"
+                className="px-3 py-1 text-sm rounded border border-gray-300 hover:bg-gray-50"
                 disabled={saving}
               >
                 Cancelar
               </button>
               <button
                 onClick={handleCreate}
-                className="px-3 py-1 text-[10px] rounded bg-[#4A6FA5] text-white hover:bg-[#3F5F8F] disabled:opacity-60"
+                className="px-3 py-1 text-sm rounded bg-[#4A6FA5] text-white hover:bg-[#3F5F8F] disabled:opacity-60"
                 disabled={saving}
               >
                 {saving ? "Salvando..." : "Salvar"}
@@ -395,7 +391,7 @@ function HorariosInner() {
             </h3>
             <div className="space-y-2 mb-3">
               <div>
-                <label className="block text-[10px] text-gray-600 mb-1">
+                <label className="block text-sm text-gray-600 mb-1">
                   Dia da semana
                 </label>
                 <select
@@ -414,7 +410,7 @@ function HorariosInner() {
               </div>
 
               <div>
-                <label className="block text-[10px] text-gray-600 mb-1">
+                <label className="block text-sm text-gray-600 mb-1">
                   Horário
                 </label>
                 <input
@@ -427,7 +423,7 @@ function HorariosInner() {
 
               <div className="flex gap-2">
                 <div className="flex-1">
-                  <label className="block text-[10px] text-gray-600 mb-1">
+                  <label className="block text-sm text-gray-600 mb-1">
                     Mínimo
                   </label>
                   <input
@@ -444,7 +440,7 @@ function HorariosInner() {
                 </div>
 
                 <div className="flex-1">
-                  <label className="block text-[10px] text-gray-600 mb-1">
+                  <label className="block text-sm text-gray-600 mb-1">
                     Máximo
                   </label>
                   <input
@@ -462,7 +458,7 @@ function HorariosInner() {
               </div>
 
               <div className="flex items-center gap-2 mt-1">
-                <label className="flex items-center gap-1 text-[10px] text-gray-700">
+                <label className="flex items-center gap-1 text-sm text-gray-700">
                   <input
                     type="checkbox"
                     checked={editActive}
@@ -476,7 +472,7 @@ function HorariosInner() {
             <div className="flex justify-between items-center gap-2">
               <button
                 onClick={handleDelete}
-                className="px-2 py-1 text-[9px] rounded border border-red-300 text-red-600 hover:bg-red-50"
+                className="px-3 py-2 text-sm rounded-lg border border-red-300 text-red-600 hover:bg-red-50 font-medium"
                 disabled={saving}
               >
                 Excluir
@@ -488,7 +484,7 @@ function HorariosInner() {
                     setShowEditModal(false);
                     setEditHorario(null);
                   }}
-                  className="px-3 py-1 text-[10px] rounded border border-gray-300 hover:bg-gray-50"
+                  className="px-3 py-1 text-sm rounded border border-gray-300 hover:bg-gray-50"
                   disabled={saving}
                 >
                   Cancelar
@@ -496,7 +492,7 @@ function HorariosInner() {
 
                 <button
                   onClick={handleEditSave}
-                  className="px-3 py-1 text-[10px] rounded bg-[#4A6FA5] text-white hover:bg-[#3F5F8F] disabled:opacity-60"
+                  className="px-3 py-1 text-sm rounded bg-[#4A6FA5] text-white hover:bg-[#3F5F8F] disabled:opacity-60"
                   disabled={saving}
                 >
                   {saving ? "Salvando..." : "Salvar"}

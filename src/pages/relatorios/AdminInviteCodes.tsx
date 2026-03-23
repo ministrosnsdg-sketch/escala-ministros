@@ -114,7 +114,7 @@ export default function AdminInviteCodes() {
 
   if (!isAdmin) {
     return (
-      <p className="text-[10px] text-gray-600">
+      <p className="text-sm text-gray-600">
         Apenas administradores podem gerenciar códigos de acesso.
       </p>
     );
@@ -122,39 +122,39 @@ export default function AdminInviteCodes() {
 
   return (
     <section className="space-y-3">
-      <div className="text-[9px] text-gray-700">
+      <div className="text-xs text-gray-700">
         Gere códigos para permitir cadastro de novos ministros pela tela de
         login.
       </div>
 
       {error && (
-        <div className="text-[10px] text-red-600 bg-red-50 border border-red-200 px-3 py-2 rounded">
+        <div className="text-sm text-red-600 bg-red-50 border-2 border-red-200 px-3 py-2 rounded-lg">
           {error}
         </div>
       )}
 
       {/* Form */}
-      <div className="bg-white border border-gray-200 rounded-lg p-3">
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
           <div>
-            <label className="block text-[9px] text-gray-600 mb-1">
+            <label className="block text-sm text-gray-600 mb-1 font-medium">
               Descrição (opcional)
             </label>
             <input
-              className="w-full border rounded px-2 py-1 text-[10px]"
+              className="w-full border rounded px-2 py-1 text-sm"
               value={desc}
               onChange={(e) => setDesc(e.target.value)}
               placeholder="Ex: Turma 2025"
             />
           </div>
           <div>
-            <label className="block text-[9px] text-gray-600 mb-1">
+            <label className="block text-sm text-gray-600 mb-1 font-medium">
               Máx. usos
             </label>
             <input
               type="number"
               min={1}
-              className="w-full border rounded px-2 py-1 text-[10px]"
+              className="w-full border rounded px-2 py-1 text-sm"
               value={maxUses}
               onChange={(e) =>
                 setMaxUses(Number(e.target.value) || 1)
@@ -162,13 +162,13 @@ export default function AdminInviteCodes() {
             />
           </div>
           <div>
-            <label className="block text-[9px] text-gray-600 mb-1">
+            <label className="block text-sm text-gray-600 mb-1 font-medium">
               Validade (dias)
             </label>
             <input
               type="number"
               min={0}
-              className="w-full border rounded px-2 py-1 text-[10px]"
+              className="w-full border rounded px-2 py-1 text-sm"
               value={daysValid}
               onChange={(e) =>
                 setDaysValid(
@@ -182,7 +182,7 @@ export default function AdminInviteCodes() {
           <button
             onClick={handleCreate}
             disabled={saving}
-            className="px-3 py-1.5 text-[9px] rounded bg-[#4A6FA5] text-white hover:bg-[#3F5F8F] disabled:opacity-60"
+            className="px-3 py-1.5 text-xs rounded bg-[#4A6FA5] text-white hover:bg-[#3F5F8F] disabled:opacity-60"
           >
             {saving ? "Gerando..." : "Gerar novo código"}
           </button>
@@ -190,20 +190,20 @@ export default function AdminInviteCodes() {
       </div>
 
       {/* Lista */}
-      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-        <div className="px-3 py-2 bg-[#D6E6F7] text-[10px] text-[#3F5F8F] font-semibold">
+      <div className="bg-white border-2 border-gray-200 rounded-lg overflow-hidden shadow-sm">
+        <div className="px-4 py-3 bg-gradient-to-r from-[#EEF4FF] to-[#F8FAFF] text-sm font-bold text-[#1E3A6E] border-b border-[#D6E6F7]">
           Códigos gerados
         </div>
         {loading ? (
-          <div className="p-3 text-[9px] text-gray-600">
+          <div className="p-3 text-xs text-gray-600">
             Carregando...
           </div>
         ) : codes.length === 0 ? (
-          <div className="p-3 text-[9px] text-gray-600">
+          <div className="p-3 text-xs text-gray-600">
             Nenhum código gerado.
           </div>
         ) : (
-          <table className="min-w-full text-[9px]">
+          <table className="min-w-full text-sm">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-2 py-1 text-left">Código</th>
@@ -251,7 +251,7 @@ export default function AdminInviteCodes() {
                           toggleActive(c.id, c.active)
                         }
                         disabled={saving}
-                        className="px-2 py-0.5 border rounded text-[8px] hover:bg-gray-50"
+                        className="px-3 py-1 border-2 rounded-lg text-xs font-medium hover:bg-gray-50"
                       >
                         {c.active ? "Desativar" : "Ativar"}
                       </button>

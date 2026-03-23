@@ -1006,456 +1006,284 @@ setBlockedDates(blockedDatesSet);
   }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-3">
+    <div className="max-w-lg mx-auto space-y-4">
 
       {/* Cabeçalho */}
-      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2">
+      <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold text-[#4A6FA5]">
-            Disponibilidade Mensal
-          </h2>
-          <p className="text-[10px] text-gray-700">
-            Selecione os dias e horários. Suas escolhas só valem após confirmação.
-          </p>
+          <h2 className="text-xl font-bold text-[#1E3A6E]">Disponibilidade</h2>
+          <p className="text-xs text-gray-500 mt-0.5">{monthLabel}</p>
         </div>
-        <div className="flex gap-2 items-center">
-          <select
-  className="border rounded px-2 py-1 text-[10px]"
-  value={month}
-  onChange={(e) => setMonth(Number(e.target.value))}
->
-  {MONTH_NAMES.map((name, idx) => (
-    <option key={idx} value={idx}>
-      {name}
-    </option>
-  ))}
-</select>
-
-<select
-  className="border rounded px-2 py-1 text-[10px] w-20"
-  value={year}
-  onChange={(e) => setYear(Number(e.target.value))}
->
-  {Array.from({ length: 10 }).map((_, i) => {
-    const y = new Date().getFullYear() - 2 + i; // 2 anos antes, 7 depois (ajustável)
-    return (
-      <option key={y} value={y}>
-        {y}
-      </option>
-    );
-  })}
-</select>
+        <div className="flex gap-1.5">
+          <select className="border-2 border-gray-200 rounded-xl px-2 py-1.5 text-sm font-medium bg-white focus:border-[#4A6FA5] focus:outline-none"
+            value={month} onChange={(e) => setMonth(Number(e.target.value))}>
+            {MONTH_NAMES.map((name, idx) => <option key={idx} value={idx}>{name}</option>)}
+          </select>
+          <select className="border-2 border-gray-200 rounded-xl px-2 py-1.5 text-sm font-medium bg-white w-20 focus:border-[#4A6FA5] focus:outline-none"
+            value={year} onChange={(e) => setYear(Number(e.target.value))}>
+            {Array.from({ length: 10 }).map((_, i) => { const y = new Date().getFullYear() - 2 + i; return <option key={y} value={y}>{y}</option>; })}
+          </select>
         </div>
       </div>
 
-      {/* Info da janela */}
-      <div className="bg-[#F7FAFF] border border-[#D6E6F7] rounded-xl px-3 py-2 text-[9px] text-[#3F5F8F] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
-        <div>{windowMessage}</div>
-        {isAdmin && (
-          <div className="text-[8px] text-gray-500">
-            (Config. em Relatórios &gt; Janela de disponibilidade)
-          </div>
-        )}
+      {/* Banner de janela */}
+      <div className={`rounded-2xl px-4 py-3 text-sm flex items-start gap-3 ${
+        canEditSelectedMonth
+          ? "bg-green-50 border-2 border-green-200 text-green-800"
+          : "bg-amber-50 border-2 border-amber-200 text-amber-800"
+      }`}>
+        <span className="text-lg flex-shrink-0">{canEditSelectedMonth ? "✅" : "🔒"}</span>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium">{windowMessage}</p>
+          {isAdmin && <p className="text-xs mt-0.5 opacity-70">Config. em Relatórios › Janela de disponibilidade</p>}
+        </div>
       </div>
 
-      {/* Seleção ministro */}
+      {/* Seleção de ministro (admin) */}
       {isAdmin && (
-        <div className="mb-1">
-          <label className="block text-[9px] text-gray-600 mb-1">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+          <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
             Editando disponibilidade de:
           </label>
-          <input
-            type="text"
-            className="border rounded px-2 py-1 text-[10px] w-full mb-1"
-            placeholder="Buscar ministro..."
-            value={ministerSearch}
-            onChange={(e) => handleMinisterSearchChange(e.target.value)}
-          />
-          <select
-            className="border rounded px-2 py-1 text-[10px] min-w-[220px]"
-            value={selectedMinisterId || ""}
-            onChange={(e) => setSelectedMinisterId(e.target.value)}
-          >
+          <input type="text" className="w-full border-2 border-gray-200 rounded-xl px-3 py-2 text-sm mb-2 focus:border-[#4A6FA5] focus:outline-none"
+            placeholder="Buscar ministro..." value={ministerSearch}
+            onChange={(e) => handleMinisterSearchChange(e.target.value)} />
+          <select className="w-full border-2 border-gray-200 rounded-xl px-3 py-2 text-sm focus:border-[#4A6FA5] focus:outline-none"
+            value={selectedMinisterId || ""} onChange={(e) => setSelectedMinisterId(e.target.value)}>
             {ministers.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name} {m.is_admin ? "(Admin)" : ""}
-              </option>
+              <option key={m.id} value={m.id}>{m.name}{m.is_admin ? " (Admin)" : ""}</option>
             ))}
           </select>
         </div>
       )}
 
-      {/* ERROS / INFOS */}
-      {error && (
-        <div className="text-[10px] text-red-600 bg-red-50 border border-red-200 px-3 py-2 rounded">
-          {error}
+      {/* Erros / infos */}
+      {error && <div className="text-sm text-red-600 bg-red-50 border-2 border-red-200 px-4 py-3 rounded-2xl flex items-center gap-2"><span>⚠️</span>{error}</div>}
+      {info && <div className="text-sm text-green-700 bg-green-50 border-2 border-green-200 px-4 py-3 rounded-2xl flex items-center gap-2"><span>✅</span>{info}</div>}
+
+      {/* Recorrência */}
+      {canEditSelectedMonth && (
+        <div className="bg-gradient-to-r from-[#FFF7EC] to-[#FFFBF5] border-2 border-[#FCD9A5] rounded-2xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-base">⚡</span>
+            <p className="text-sm font-bold text-[#EA580C]">Preenchimento rápido</p>
+          </div>
+          <div className="grid grid-cols-2 gap-2 mb-3">
+            <div>
+              <label className="block text-xs font-semibold text-[#EA580C] mb-1.5">Dia da semana</label>
+              <select className="w-full border-2 border-[#FCD9A5] rounded-xl px-2 py-2 text-sm bg-white focus:outline-none"
+                value={recWeekday === "" ? "" : recWeekday}
+                onChange={(e) => setRecWeekday(e.target.value === "" ? "" : Number(e.target.value))}>
+                <option value="">Selecione</option>
+                {WEEKDAYS_FULL.map((w, idx) => <option key={idx} value={idx}>{w}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-[#EA580C] mb-1.5">Horário fixo</label>
+              <select className="w-full border-2 border-[#FCD9A5] rounded-xl px-2 py-2 text-sm bg-white focus:outline-none"
+                value={recHorarioId === "" ? "" : recHorarioId}
+                onChange={(e) => setRecHorarioId(e.target.value === "" ? "" : Number(e.target.value))}
+                disabled={recWeekday === "" || horariosForRecWeekday.length === 0}>
+                <option value="">Selecione</option>
+                {horariosForRecWeekday.map((h) => (
+                  <option key={h.id} value={h.id}>{WEEKDAYS_FULL[h.weekday]} — {h.time.slice(0, 5)}h</option>
+                ))}
+              </select>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={() => applyRecurrence("set")} disabled={recWeekday === "" || recHorarioId === "" || savingAll}
+              className="flex-1 py-2.5 rounded-xl bg-[#F97316] text-white text-sm font-bold disabled:opacity-50 active:scale-95 transition-transform">
+              Aplicar no mês
+            </button>
+            <button onClick={() => applyRecurrence("clear")} disabled={recWeekday === "" || recHorarioId === "" || savingAll}
+              className="flex-1 py-2.5 rounded-xl border-2 border-[#FCD9A5] text-[#EA580C] text-sm font-bold disabled:opacity-50 active:scale-95 transition-transform">
+              Limpar
+            </button>
+          </div>
+          <p className="text-xs text-gray-400 mt-2">Ex: "Todos os domingos às 08:30h" → selecione e toque em Aplicar.</p>
         </div>
       )}
-      {info && (
-        <div className="text-[10px] text-green-700 bg-green-50 border border-green-200 px-3 py-2 rounded">
-          {info}
-        </div>
-      )}
-{/* ================= RECORRÊNCIA ================= */}
-{canEditSelectedMonth && (
-  <div className="bg-[#FFF7EC] border border-[#FCD9A5] rounded-2xl p-3 text-[9px] space-y-2">
-
-    <div className="flex flex-col sm:flex-row sm:items-end gap-2">
-
-      {/* Dia da semana */}
-      <div className="flex-1">
-        <label className="block text-[9px] text-[#EA580C] mb-1">
-          Recorrência — Dia da semana
-        </label>
-        <select
-          className="w-full border border-[#FCD9A5] rounded px-2 py-1 text-[10px]"
-          value={recWeekday === "" ? "" : recWeekday}
-          onChange={(e) =>
-            setRecWeekday(
-              e.target.value === "" ? "" : Number(e.target.value)
-            )
-          }
-        >
-          <option value="">Selecione</option>
-          {WEEKDAYS_FULL.map((w, idx) => (
-            <option key={idx} value={idx}>
-              {w}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* Horário */}
-      <div className="flex-1">
-        <label className="block text-[9px] text-[#EA580C] mb-1">
-          Horário fixo
-        </label>
-        <select
-          className="w-full border border-[#FCD9A5] rounded px-2 py-1 text-[10px]"
-          value={recHorarioId === "" ? "" : recHorarioId}
-          onChange={(e) =>
-            setRecHorarioId(
-              e.target.value === "" ? "" : Number(e.target.value)
-            )
-          }
-          disabled={
-            recWeekday === "" || horariosForRecWeekday.length === 0
-          }
-        >
-          <option value="">Selecione</option>
-          {horariosForRecWeekday.map((h) => (
-            <option key={h.id} value={h.id}>
-              {WEEKDAYS_FULL[h.weekday]} — {h.time.slice(0, 5)}h
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* Botões */}
-      <div className="flex flex-col sm:flex-row gap-1 sm:ml-2">
-
-        {/* Aplicar */}
-        <button
-          onClick={() => applyRecurrence("set")}
-          disabled={
-            recWeekday === "" || recHorarioId === "" || savingAll
-          }
-          className="px-3 py-1.5 rounded-full bg-[#F97316] text-white text-[9px] hover:bg-[#EA580C] disabled:opacity-50"
-        >
-          Aplicar no mês
-        </button>
-
-        {/* Limpar */}
-        <button
-          onClick={() => applyRecurrence("clear")}
-          disabled={
-            recWeekday === "" || recHorarioId === "" || savingAll
-          }
-          className="px-3 py-1.5 rounded-full border border-[#FCD9A5] text-[9px] text-[#EA580C] hover:bg-[#FFF1E0] disabled:opacity-50"
-        >
-          Limpar recorrência
-        </button>
-
-      </div>
-    </div>
-
-    <p className="text-[8px] text-gray-500">
-      Exemplo: “Todas as segundas às 11h30” — selecione dia e hora e clique.
-    </p>
-  </div>
-)}
 
       {/* CALENDÁRIO */}
-      <div className="bg-white border border-gray-200 rounded-2xl p-3">
-        <div className="text-center mb-2">
-          <div className="inline-block px-6 py-1.5 rounded-full bg-[#2756A3] text-white text-[11px] font-semibold">
-            {monthLabel.toUpperCase()}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="bg-gradient-to-r from-[#1E3A6E] to-[#4A6FA5] px-4 py-3">
+          <div className="grid grid-cols-7 text-center">
+            {WEEKDAYS_SHORT.map((w, i) => (
+              <div key={i} className={`text-xs font-bold ${i === 0 ? "text-red-300" : "text-blue-200"}`}>{w}</div>
+            ))}
           </div>
         </div>
 
-        <div className="grid grid-cols-7 gap-1 text-center mb-1 text-[9px] font-semibold text-[#2756A3]">
-          {WEEKDAYS_SHORT.map((w, i) => (
-            <div key={i}>{w}</div>
-          ))}
-        </div>
+        <div className="p-2">
+          <div className="grid grid-cols-7 gap-1">
+            {daysMatrix.map((week, wi) =>
+              week.map((cell, ci) => {
+                if (!cell.date || cell.day === null) {
+                  return <div key={`${wi}-${ci}`} className="h-11 rounded-xl" />;
+                }
+                const date = cell.date;
+                const d = new Date(date + "T00:00:00");
+                const wd = d.getDay();
+                const hs = horariosPorWeekday[wd] || [];
+                const hasHorario = hs.length > 0;
+                const hasExtras = !!extrasByDate[date];
+                const hasFixedSelection = hasHorario && hs.some((h) => monthlyDraft.has(`${date}|${h.id}`));
+                const hasExtraSelection = hasExtras && (extrasByDate[date] || []).some((e) => extrasDraft.has(e.id));
+                const hasSelection = hasFixedSelection || hasExtraSelection;
+                const isDisabled = !hasHorario && !hasExtras;
+                const isSelected = selectedDate === date;
+                const isBlocked = blockedDates.has(date);
+                // Só ofusca se bloqueado E não tiver missas solenes (extras) no dia
+                const shouldDim = isBlocked && !hasExtras;
 
-        <div className="grid grid-cols-7 gap-1 text-center text-[10px]">
-          {daysMatrix.map((week, wi) =>
-            week.map((cell, ci) => {
-              if (!cell.date || cell.day === null) {
                 return (
-                  <div key={`${wi}-${ci}`} className="h-8 rounded-lg" />
+                  <button key={date}
+                    onClick={() => { if (!isDisabled) setSelectedDate(date); }}
+                    className={`h-11 rounded-xl flex flex-col items-center justify-center transition-all active:scale-95 ${
+                      isDisabled
+                        ? "bg-transparent text-gray-200 cursor-default"
+                        : isSelected
+                        ? "bg-[#4A6FA5] shadow-md shadow-blue-200 ring-2 ring-[#4A6FA5] ring-offset-1"
+                        : hasSelection
+                        ? "bg-green-50 border-2 border-green-400"
+                        : "bg-gray-50 border border-gray-200 hover:border-blue-300"
+                    } ${shouldDim ? "opacity-40" : ""}`}
+                  >
+                    <span className={`text-sm font-bold leading-none ${
+                      isSelected ? "text-white" : isDisabled ? "text-gray-300" : "text-gray-700"
+                    }`}>{cell.day}</span>
+                    <div className="flex gap-0.5 mt-0.5">
+                      {hasSelection && !isSelected && <span className="w-1.5 h-1.5 rounded-full bg-green-500" />}
+                      {hasExtras && <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />}
+                      {isBlocked && <span className="w-1.5 h-1.5 rounded-full bg-red-500" />}
+                    </div>
+                  </button>
                 );
-              }
-
-              const date = cell.date;
-              const d = new Date(date + "T00:00:00");
-              const wd = d.getDay();
-
-              const hs = horariosPorWeekday[wd] || [];
-              const hasHorario = hs.length > 0;
-              const hasExtras = !!extrasByDate[date];
-
-              const hasFixedSelection =
-                hasHorario &&
-                hs.some((h) => monthlyDraft.has(`${date}|${h.id}`));
-
-              const hasExtraSelection =
-                hasExtras &&
-                (extrasByDate[date] || []).some((e) =>
-                  extrasDraft.has(e.id)
-                );
-
-              const hasSelection = hasFixedSelection || hasExtraSelection;
-
-              const isDisabled = !hasHorario && !hasExtras;
-              const isSelected = selectedDate === date;
-
-              const base =
-                "h-8 flex flex-col items-center justify-center rounded-lg border text-[10px] transition-colors";
-              let cls =
-                "border-gray-200 bg-white text-gray-800 cursor-pointer hover:bg-[#EEF4FF]";
-
-              if (isDisabled) {
-                cls =
-                  "border-transparent bg-gray-50 text-gray-300 cursor-default";
-              }
-
-              if (isSelected && !isDisabled) {
-                cls =
-                  "border-[#2756A3] bg-white text-[#2756A3] font-semibold shadow-sm";
-              }
-
-              return (
-                <button
-                  key={date}
-                  onClick={() => {
-                    setSelectedDate(date);
-                  }}
-                  className={`${base} ${cls}`}
-                >
-                  <span>{cell.day}</span>
-                  <div className="mt-[1px] flex gap-[2px]">
-  {hasSelection && (
-    <span className="w-1.5 h-1.5 rounded-full bg-[#16A34A]" />
-  )}
-  {hasExtras && (
-    <span className="w-1.5 h-1.5 rounded-full bg-purple-600" />
-  )}
-  {blockedDates.has(date) && (
-    <span className="w-1.5 h-1.5 rounded-full bg-red-600" />
-  )}
-</div>
-                </button>
-              );
-            })
-          )}
+              })
+            )}
+          </div>
         </div>
 
-        {/* LEGENDA */}
-        <div className="mt-3 flex flex-wrap gap-3 text-[8px] text-gray-600">
-          <div className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-[#16A34A]" />
-            <span>Dia com horários marcados</span>
-          </div> 
-          <div className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full bg-purple-600" />
-            <span>Dia com missa extra</span>
-            <div className="flex items-center gap-1">
-  <span className="w-2 h-2 rounded-full bg-red-600" />
-  <span>Dia com horários bloqueados</span>
-</div>
-          </div>
+        <div className="px-4 py-2.5 bg-gray-50 border-t border-gray-100 flex flex-wrap gap-3">
+          <span className="inline-flex items-center gap-1.5 text-xs text-gray-500"><span className="w-2 h-2 rounded-full bg-[#4A6FA5]" />Selecionado</span>
+          <span className="inline-flex items-center gap-1.5 text-xs text-gray-500"><span className="w-2 h-2 rounded-full bg-green-500" />Marcado</span>
+          <span className="inline-flex items-center gap-1.5 text-xs text-gray-500"><span className="w-2 h-2 rounded-full bg-purple-500" />Extra</span>
+          <span className="inline-flex items-center gap-1.5 text-xs text-gray-500"><span className="w-2 h-2 rounded-full bg-red-500" />Contêm horários bloqueados</span>
         </div>
       </div>
 
-      {/* ========= MODAL CENTRAL ========= */}
+      {/* MODAL CENTRAL */}
       {selectedDate && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-3">
-          <div className="bg-white w-full max-w-md rounded-xl shadow-2xl border border-gray-200 p-4">
+        <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+          <div className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden max-h-[85vh] flex flex-col">
+
+            {/* Handle mobile */}
+            <div className="flex justify-center pt-3 pb-1 sm:hidden">
+              <div className="w-10 h-1 bg-gray-200 rounded-full" />
+            </div>
 
             {/* Cabeçalho modal */}
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
               <div>
-                <h3 className="text-sm font-semibold text-[#4A6FA5]">
-                  {weekdayLabel} — {selectedDate.split("-").reverse().join("/")}
+                <h3 className="text-base font-bold text-[#1E3A6E]">
+                  {weekdayLabel}
                 </h3>
-                <p className="text-[10px] text-gray-600">
-                  Marque os horários desejados.
-                </p>
+                <p className="text-xs text-gray-500">{selectedDate.split("-").reverse().join("/")}</p>
               </div>
-
-              <button
-                onClick={() => setSelectedDate(null)}
-                className="text-[10px] px-2 py-1 bg-gray-100 hover:bg-gray-200 rounded"
-              >
-                Fechar
+              <button onClick={() => setSelectedDate(null)}
+                className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 text-lg font-bold">
+                ×
               </button>
             </div>
 
-            {/* Conteúdo modal */}
-            <div className="space-y-4 max-h-[70vh] overflow-y-auto px-1">
+            {/* Conteúdo */}
+            <div className="overflow-y-auto flex-1 px-5 py-4 space-y-4">
 
-              {/* Horários Fixos (OCULTA quando houver missa extra no mesmo horário) */}
-{dayHorarios.length > 0 && (
-  <div>
-    <h4 className="text-xs font-semibold text-gray-700 mb-1">
-      Missas Fixas
-    </h4>
-
-    <div className="space-y-2">
-      {dayHorarios.map((h) => {
-  const extraSameTime = dayExtras.some(
-    (e) => e.time === h.time
-  );
-
-  if (extraSameTime) {
-    return null;
-  }
-
-  const key = `${selectedDate}|${h.id}`;
-  const checked = monthlyDraft.has(key);
-  const count = slotCounts[key] || 0;
-  
-  // VERIFICAR SE ESTÁ BLOQUEADO
-  const blocked = blockedMasses.find(b => b.date === selectedDate);
-  const isBlocked = blocked && blocked.blocked_times && blocked.blocked_times.includes(h.time);
-
-  return (
-    <div
-      key={h.id}
-      className={`flex items-center justify-between border rounded-lg px-3 py-2 ${isBlocked ? 'bg-red-50 border-red-300 opacity-60' : 'bg-gray-50'}`}
-    >
-      <div>
-        <div className="text-[11px] font-semibold">
-          {h.time.slice(0, 5)}h
-          {isBlocked && <span className="ml-2 text-red-600 text-[9px]">NÃO HAVERÁ MISSA</span>}
-        </div>
-        <div className="text-[9px] text-gray-600">
-          {isBlocked ? `Motivo: ${blocked.reason || 'Não especificado'}` : `Min ${h.min_required} • Máx ${h.max_allowed} • Atual ${count}`}
-        </div>
-      </div>
-
-      <input
-        type="checkbox"
-        className="w-4 h-4"
-        checked={checked}
-        onChange={() => toggleDraftMonthly(selectedDate, h.id)}
-        disabled={!canEditSelectedMonth || isBlocked}
-      />
-    </div>
-  );
-})}
-    </div>
-  </div>
-)}
-{/* Missas Extras */}
-              {dayExtras.length > 0 && (
+              {dayHorarios.length > 0 && (
                 <div>
-                  <h4 className="text-xs font-semibold text-purple-700 mb-1">
-                    Missas Extras
-                  </h4>
-
+                  <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Missas Fixas</h4>
                   <div className="space-y-2">
-                    {dayExtras.map((e) => {
-  const checked = extrasDraft.has(e.id);
-  const count = extraCounts[e.id] || 0;
-  
-  // VERIFICAR SE ESTÁ BLOQUEADO
-  const blocked = blockedMasses.find(b => b.date === selectedDate);
-  const isBlocked = blocked && blocked.blocked_times && blocked.blocked_times.includes(e.time);
-
-  return (
-    <div
-      key={e.id}
-      className={`flex items-center justify-between border rounded-lg px-3 py-2 ${isBlocked ? 'bg-red-50 border-red-300 opacity-60' : 'bg-purple-50 border-purple-300'}`}
-    >
-      <div>
-        <div className="text-[11px] font-semibold text-purple-700">
-          {e.time.slice(0, 5)}h – {e.title}
-          {isBlocked && <span className="ml-2 text-red-600 text-[9px]">NÃO HAVERÁ MISSA</span>}
-        </div>
-        <div className="text-[9px] text-gray-600">
-          {isBlocked ? `Motivo: ${blocked.reason || 'Não especificado'}` : `Min ${e.min_required} • Máx ${e.max_allowed} • Atual ${count}`}
-        </div>
-      </div>
-
-      <input
-        type="checkbox"
-        className="w-4 h-4 text-purple-700"
-        checked={checked}
-        onChange={() => toggleDraftExtra(e.id)}
-        disabled={!canEditSelectedMonth || isBlocked}
-      />
-    </div>
-  );
-})}
+                    {dayHorarios.map((h) => {
+                      const extraSameTime = dayExtras.some((e) => e.time === h.time);
+                      if (extraSameTime) return null;
+                      const key = `${selectedDate}|${h.id}`;
+                      const checked = monthlyDraft.has(key);
+                      const count = slotCounts[key] || 0;
+                      const blocked = blockedMasses.find(b => b.date === selectedDate);
+                      const isBlocked = blocked && blocked.blocked_times && blocked.blocked_times.includes(h.time);
+                      return (
+                        <label key={h.id} className={`flex items-center gap-3 p-3 rounded-2xl border-2 cursor-pointer transition-all ${
+                          isBlocked ? "bg-red-50 border-red-200 opacity-60 cursor-not-allowed"
+                          : checked ? "bg-[#EEF4FF] border-[#4A6FA5]"
+                          : "bg-gray-50 border-gray-200 hover:border-gray-300"
+                        }`}>
+                          <input type="checkbox" className="w-5 h-5 accent-[#4A6FA5] flex-shrink-0"
+                            checked={checked} onChange={() => toggleDraftMonthly(selectedDate, h.id)}
+                            disabled={!canEditSelectedMonth || !!isBlocked} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-bold text-gray-800">
+                              {h.time.slice(0, 5)}h
+                              {isBlocked && <span className="ml-2 text-xs text-red-600 font-semibold">Bloqueado</span>}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {isBlocked ? <span className="text-red-400 italic">Não haverá missa{blocked!.reason ? ` — ${blocked!.reason}` : ""}</span> : `Mín ${h.min_required} · Máx ${h.max_allowed} · Atual ${count}`}
+                            </p>
+                          </div>
+                          {checked && !isBlocked && <span className="text-[#4A6FA5] font-bold text-lg flex-shrink-0">✓</span>}
+                        </label>
+                      );
+                    })}
                   </div>
                 </div>
               )}
 
-              {/* Sem horários */}
+              {dayExtras.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-bold text-purple-500 uppercase tracking-wide mb-2">Missas Solenes</h4>
+                  <div className="space-y-2">
+                    {dayExtras.map((e) => {
+                      const checked = extrasDraft.has(e.id);
+                      const count = extraCounts[e.id] || 0;
+                      const blocked = blockedMasses.find(b => b.date === selectedDate);
+                      const isBlocked = blocked && blocked.blocked_times && blocked.blocked_times.includes(e.time);
+                      return (
+                        <label key={e.id} className={`flex items-center gap-3 p-3 rounded-2xl border-2 cursor-pointer transition-all ${
+                          isBlocked ? "bg-red-50 border-red-200 opacity-60 cursor-not-allowed"
+                          : checked ? "bg-purple-50 border-purple-400"
+                          : "bg-purple-50/30 border-purple-200 hover:border-purple-300"
+                        }`}>
+                          <input type="checkbox" className="w-5 h-5 accent-purple-600 flex-shrink-0"
+                            checked={checked} onChange={() => toggleDraftExtra(e.id)}
+                            disabled={!canEditSelectedMonth || !!isBlocked} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-bold text-purple-700">
+                              {e.time.slice(0, 5)}h · {e.title}
+                              {isBlocked && <span className="ml-2 text-xs text-red-600 font-semibold">Bloqueado</span>}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {isBlocked ? <span className="text-red-400 italic">Não haverá missa{blocked!.reason ? ` — ${blocked!.reason}` : ""}</span> : `Mín ${e.min_required} · Máx ${e.max_allowed} · Atual ${count}`}
+                            </p>
+                          </div>
+                          {checked && !isBlocked && <span className="text-purple-600 font-bold text-lg flex-shrink-0">✓</span>}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {dayHorarios.length === 0 && dayExtras.length === 0 && (
-                <div className="text-[10px] text-gray-600 text-center py-4">
-                  Não há horários cadastrados para este dia.
+                <div className="text-center py-8 text-gray-400">
+                  <p className="text-2xl mb-2">📅</p>
+                  <p className="text-sm">Nenhum horário para este dia.</p>
                 </div>
               )}
             </div>
 
-            {/* Rodapé modal */}
-            <div className="mt-4 flex justify-end">
-              <button
-                onClick={() => setSelectedDate(null)}
-                className="text-[10px] px-4 py-2 bg-[#4A6FA5] text-white rounded hover:bg-[#3F5F8F] transition"
-              >
-                OK
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      {/* ========= MODAL DE CONFIRMAÇÃO (Salvar) ========= */}
-      {showConfirm && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-4 border border-gray-200">
-            <h3 className="text-sm font-semibold text-[#4A6FA5] mb-2">
-              Confirmar alterações?
-            </h3>
-            <p className="text-[10px] text-gray-700 mb-4">
-              Você possui alterações não salvas. Deseja confirmar agora?
-            </p>
-
-            <div className="flex justify-end gap-2 mt-2">
-              <button
-                onClick={() => setShowConfirm(false)}
-                className="text-[10px] px-3 py-1 rounded bg-gray-100 hover:bg-gray-200"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleConfirmOnly}
-                className="text-[10px] px-3 py-1 rounded bg-[#4A6FA5] text-white hover:bg-[#3F5F8F]"
-              >
+            <div className="px-5 py-4 border-t border-gray-100">
+              <button onClick={() => setSelectedDate(null)}
+                className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-[#2756A3] to-[#4A6FA5] text-white text-sm font-bold shadow-md shadow-blue-100 active:scale-95 transition-transform">
                 Confirmar
               </button>
             </div>
@@ -1463,63 +1291,77 @@ setBlockedDates(blockedDatesSet);
         </div>
       )}
 
-      {/* ========= MODAL CONFIRMAR NAVEGAÇÃO ========= */}
-      {showNavConfirm && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm p-4 border border-gray-200">
-            <h3 className="text-sm font-semibold text-[#4A6FA5] mb-2">
-              Sair sem salvar?
-            </h3>
-            <p className="text-[10px] text-gray-700 mb-4">
-              Há alterações não salvas. Deseja realmente sair?
-            </p>
-
-            <div className="flex justify-end gap-2 mt-2">
-              <button
-                onClick={handleStayOnPage}
-                className="text-[10px] px-3 py-1 rounded bg-gray-100 hover:bg-gray-200"
-              >
-                Permanecer
+      {/* Modal confirmar alterações */}
+      {showConfirm && (
+        <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+          <div className="bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-2xl shadow-2xl p-5">
+            <div className="flex justify-center mb-4 sm:hidden">
+              <div className="w-10 h-1 bg-gray-200 rounded-full" />
+            </div>
+            <h3 className="text-base font-bold text-[#1E3A6E] mb-2">Salvar alterações?</h3>
+            <p className="text-sm text-gray-600 mb-5">Deseja confirmar as marcações para este mês?</p>
+            <div className="flex gap-2">
+              <button onClick={() => setShowConfirm(false)}
+                className="flex-1 py-3 rounded-2xl border-2 border-gray-200 text-gray-700 text-sm font-semibold hover:bg-gray-50">
+                Cancelar
               </button>
-              <button
-                onClick={handleDiscardAndNavigate}
-                className="text-[10px] px-3 py-1 rounded bg-red-600 text-white hover:bg-red-700"
-              >
-                Descartar
-              </button>
-              <button
-                onClick={handleConfirmAndNavigate}
-                className="text-[10px] px-3 py-1 rounded bg-[#4A6FA5] text-white hover:bg-[#3F5F8F]"
-              >
-                Salvar e Sair
+              <button onClick={handleConfirmOnly}
+                className="flex-1 py-3 rounded-2xl bg-gradient-to-r from-[#2756A3] to-[#4A6FA5] text-white text-sm font-bold shadow-sm">
+                Confirmar
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ========= RODAPÉ — CONFIRMAR ALTERAÇÕES ========= */}
-      <div className="sticky bottom-0 bg-white border-t border-gray-200 p-3 rounded-t-xl shadow-inner">
-        <div className="flex items-center justify-between">
-          <div className="text-[10px] text-gray-600">
-            {hasPendingChanges
-              ? "Alterações pendentes"
-              : "Nenhuma alteração pendente"}
+      {/* Modal confirmar navegação */}
+      {showNavConfirm && (
+        <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+          <div className="bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-2xl shadow-2xl p-5">
+            <div className="flex justify-center mb-4 sm:hidden">
+              <div className="w-10 h-1 bg-gray-200 rounded-full" />
+            </div>
+            <h3 className="text-base font-bold text-[#1E3A6E] mb-2">Sair sem salvar?</h3>
+            <p className="text-sm text-gray-600 mb-5">Você tem alterações não salvas. O que deseja fazer?</p>
+            <div className="flex flex-col gap-2">
+              <button onClick={handleConfirmAndNavigate}
+                className="w-full py-3 rounded-2xl bg-gradient-to-r from-[#2756A3] to-[#4A6FA5] text-white text-sm font-bold">
+                Salvar e sair
+              </button>
+              <button onClick={handleDiscardAndNavigate}
+                className="w-full py-3 rounded-2xl border-2 border-red-200 text-red-600 text-sm font-semibold hover:bg-red-50">
+                Descartar e sair
+              </button>
+              <button onClick={handleStayOnPage}
+                className="w-full py-3 rounded-2xl border-2 border-gray-200 text-gray-600 text-sm font-semibold hover:bg-gray-50">
+                Permanecer na página
+              </button>
+            </div>
           </div>
+        </div>
+      )}
 
-          <button
-            onClick={openConfirm}
-            disabled={!hasPendingChanges || savingAll}
-            className={`px-4 py-2 rounded text-[11px] text-white transition ${
+      {/* RODAPÉ FIXO */}
+      <div className="sticky bottom-0 bg-white/95 backdrop-blur border-t-2 border-gray-100 p-3 rounded-t-2xl shadow-lg">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            {hasPendingChanges ? (
+              <p className="text-xs font-semibold text-amber-600 truncate">⚡ Alterações pendentes — não esqueça de confirmar!</p>
+            ) : (
+              <p className="text-xs text-gray-400">Nenhuma alteração pendente</p>
+            )}
+          </div>
+          <button onClick={openConfirm} disabled={!hasPendingChanges || savingAll}
+            className={`px-5 py-2.5 rounded-xl text-sm font-bold text-white transition-all flex-shrink-0 ${
               hasPendingChanges
-                ? "bg-[#4A6FA5] hover:bg-[#3F5F8F]"
-                : "bg-gray-400 cursor-not-allowed"
-            }`}
-          >
-            {savingAll ? "Salvando..." : "Confirmar Alterações"}
+                ? "bg-gradient-to-r from-[#2756A3] to-[#4A6FA5] shadow-md shadow-blue-100 active:scale-95"
+                : "bg-gray-200 text-gray-400 cursor-not-allowed"
+            }`}>
+            {savingAll ? "Salvando..." : "Confirmar"}
           </button>
         </div>
       </div>
+
     </div>
   );
 }

@@ -160,7 +160,7 @@ export default function ResumoPorMinistro() {
 
   if (!isAdmin) {
     return (
-      <p className="text-[10px] text-gray-600">
+      <p className="text-sm text-gray-600">
         Apenas administradores podem visualizar o resumo por ministro.
       </p>
     );
@@ -206,13 +206,13 @@ export default function ResumoPorMinistro() {
   return (
     <section className="space-y-3">
       {/* Seletores */}
-      <div className="flex flex-wrap gap-2 items-center text-[9px]">
+      <div className="flex flex-wrap gap-2 items-center text-xs">
         <div className="font-semibold text-[#4A6FA5]">
           Resumo por ministro — {label}
         </div>
 
         <select
-          className="border rounded px-2 py-1 text-[9px]"
+          className="border rounded px-2 py-1 text-xs"
           value={month}
           onChange={(e) => setMonth(Number(e.target.value))}
         >
@@ -224,7 +224,7 @@ export default function ResumoPorMinistro() {
         </select>
 
         <select
-  className="border rounded px-2 py-1 text-[9px] w-20"
+  className="border rounded px-2 py-1 text-xs w-20"
   value={year}
   onChange={(e) => setYear(Number(e.target.value))}
 >
@@ -241,7 +241,7 @@ export default function ResumoPorMinistro() {
       </div>
 
       {/* Informativo */}
-      <div className="bg-[#F7FAFF] border border-[#D6E6F7] rounded-xl px-3 py-2 text-[9px] text-[#3F5F8F]">
+      <div className="bg-[#F0F4FA] border border-[#D6E6F7] rounded-2xl px-4 py-3 text-sm text-[#3F5F8F]">
         <p>
           Cada marcação de disponibilidade (missa fixa ou extra) conta 1 ponto.
           A lista abaixo mostra quem mais se colocou disponível no período.
@@ -249,7 +249,7 @@ export default function ResumoPorMinistro() {
       </div>
 
       {/* Legenda */}
-      <div className="flex gap-3 text-[9px] items-center">
+      <div className="flex gap-3 text-xs items-center">
         <div className="flex items-center gap-1">
           <span className="w-3 h-3 rounded-full bg-green-500"></span>
           <span>Acima de 6</span>
@@ -265,7 +265,7 @@ export default function ResumoPorMinistro() {
       </div>
 
       {/* Filtro */}
-      <div className="text-[9px]">
+      <div className="text-xs">
         <label className="mr-2 text-[#4A6FA5] font-semibold">
           Filtrar por disponibilidade:
         </label>
@@ -273,7 +273,7 @@ export default function ResumoPorMinistro() {
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value as any)}
-          className="border rounded px-2 py-1 text-[9px]"
+          className="border rounded px-2 py-1 text-xs"
         >
           <option value="all">Todos os ministros</option>
           <option value="green">Acima de 6</option>
@@ -284,16 +284,16 @@ export default function ResumoPorMinistro() {
 
       {/* Erro */}
       {error && (
-        <div className="text-[10px] text-red-600 bg-red-50 border border-red-200 px-3 py-2 rounded">
+        <div className="text-sm text-red-600 bg-red-50 border-2 border-red-200 px-3 py-2 rounded-lg">
           {error}
         </div>
       )}
 
       {/* Lista */}
       {loading ? (
-        <p className="text-[10px] text-gray-600">Calculando resumo...</p>
+        <p className="text-sm text-gray-600">Calculando resumo...</p>
       ) : filteredRanking.length === 0 ? (
-        <p className="text-[9px] text-gray-500">
+        <p className="text-xs text-gray-500">
           Nenhuma disponibilidade registrada para este mês.
         </p>
       ) : (
@@ -301,14 +301,14 @@ export default function ResumoPorMinistro() {
           {/* Botão PDF */}
           <button
             onClick={exportPDF}
-            className="px-3 py-1 text-[9px] bg-[#4A6FA5] text-white rounded hover:bg-[#3F5F8F]"
+            className="px-4 py-2 text-sm bg-gradient-to-r from-[#2756A3] to-[#4A6FA5] text-white rounded-xl font-semibold"
           >
             Exportar PDF
           </button>
 
           {/* Tabela */}
           <div className="bg-white border border-gray-200 rounded-xl overflow-hidden mt-2">
-            <table className="min-w-full text-[9px]">
+            <table className="min-w-full text-sm">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-2 py-1 text-center">Posição</th>

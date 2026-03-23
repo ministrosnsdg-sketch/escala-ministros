@@ -261,6 +261,8 @@ function ExportarInner() {
     .zebra tbody tr:nth-child(even) { background: #f0f0f0 !important; }
 
     .zebra .print-separator { background: #dcdcdc !important; }
+    .zebra .print-separator.bg-purple-100 { background: #ede9fe !important; }
+    .text-purple-700 { color: #7c3aed !important; }
   }
 
   @media screen {
@@ -393,14 +395,16 @@ function ExportarInner() {
       /** HORÁRIOS */
       const { data: hData, error: hErr } = await supabase
         .from("horarios")
-        .select("id, time");
+        .select("id, time, weekday");
 
       if (hErr && hErr.code !== "42P01") throw hErr;
 
       const horarioMap = new Map<number, string>();
+      const horarioWeekdayMap = new Map<number, number>();
       (hData || []).forEach((h: any) => {
         if (!h.id || !h.time) return;
         horarioMap.set(h.id, String(h.time).slice(0, 5));
+        horarioWeekdayMap.set(h.id, h.weekday as number);
       });
 
       /** MINISTROS */
@@ -539,6 +543,10 @@ function ExportarInner() {
       if (hasFinal) {
         escalaReg.forEach((r: any) => {
           const date = r.date;
+          // Anti-ghost: validar weekday
+          const expectedDow = new Date(date + "T00:00:00").getDay();
+          const horarioDow = horarioWeekdayMap.get(r.horario_id);
+          if (horarioDow !== undefined && horarioDow !== expectedDow) return;
           const time = horarioMap.get(r.horario_id) || "";
           if (date && time) addEvento(date, time, r.minister_id, false);
         });
@@ -551,6 +559,10 @@ function ExportarInner() {
       } else {
         avReg.forEach((r: any) => {
           const date = r.date;
+          // Anti-ghost: validar weekday
+          const expectedDow = new Date(date + "T00:00:00").getDay();
+          const horarioDow = horarioWeekdayMap.get(r.horario_id);
+          if (horarioDow !== undefined && horarioDow !== expectedDow) return;
           const time = horarioMap.get(r.horario_id) || "";
           if (date && time)
             addEvento(date, time, r.minister_id, false);
@@ -759,12 +771,12 @@ function ExportarInner() {
       <style>{printCss}</style>
 
       {/* Controles */}
-      <div className="no-print flex flex-wrap items-center justify-between gap-3 mb-4">
+      <div className="no-print flex flex-wrap items-center justify-between gap-3 mb-4 p-4 bg-[#F0F4FA] rounded-2xl border border-gray-200">
         <div className="flex gap-2">
           <select
             value={mes0}
             onChange={(e) => setMes0(parseInt(e.target.value, 10))}
-            className="px-3 py-2 rounded-2xl border text-xs font-semibold bg-white"
+            className="border-2 border-gray-200 rounded-xl px-3 py-2 text-sm font-semibold bg-white focus:border-[#4A6FA5] focus:outline-none"
           >
             {MESES.map((m, i) => (
               <option key={i} value={i}>
@@ -776,7 +788,7 @@ function ExportarInner() {
           <select
             value={ano}
             onChange={(e) => setAno(parseInt(e.target.value, 10))}
-            className="px-3 py-2 rounded-2xl border text-xs font-semibold bg-white"
+            className="border-2 border-gray-200 rounded-xl px-3 py-2 text-sm font-semibold bg-white focus:border-[#4A6FA5] focus:outline-none"
           >
             {Array.from({ length: 7 }, (_, k) => ano - 3 + k).map((y) => (
               <option key={y} value={y}>
@@ -789,15 +801,15 @@ function ExportarInner() {
         <button
           onClick={handlePrint}
           disabled={carregando}
-          className="px-4 py-2 rounded-2xl bg-[#1f3c88] text-white text-sm font-bold shadow no-print disabled:opacity-50"
+          className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#1E3A6E] to-[#4A6FA5] text-white text-sm font-bold shadow-md no-print disabled:opacity-50"
         >
           Imprimir / Salvar PDF (A4)
         </button>
       </div>
 
       {/* Filtros */}
-      <div className="no-print bg-white border rounded-2xl p-4 mb-4 space-y-3">
-        <div className="text-sm font-semibold">
+      <div className="no-print bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-4 space-y-3">
+        <div className="text-sm font-bold text-[#1E3A6E]">
           Selecionar quais páginas de escala serão incluídas na impressão
         </div>
 
@@ -914,10 +926,10 @@ function ExportarInner() {
                         key={`${ev.date}-${ev.time}-${ev.tituloExtra || ""}-${i}`}
                       >
                         {ev.groupLabel && (
-                          <tr className="bg-gray-200 print-separator">
+                          <tr className={`print-separator ${ev.groupLabel.includes("SOLENES") ? "bg-purple-100" : "bg-gray-200"}`}>
                             <td
                               colSpan={3}
-                              className="p-1.5 border text-left font-bold text-[9px] text-gray-800"
+                              className={`p-1.5 border text-left font-bold ${ev.groupLabel.includes("SOLENES") ? "text-[12px] text-purple-700" : "text-[9px] text-gray-800"}`}
                             >
                               {ev.groupLabel}
                             </td>
@@ -933,7 +945,7 @@ function ExportarInner() {
                             {labelDiaSemana}
 
                             {ev.isExtra && ev.tituloExtra && (
-                              <div className="text-[8px] text-gray-600 font-normal">
+                              <div className="text-[10px] text-purple-700 font-bold">
                                 {ev.tituloExtra}
                               </div>
                             )}
@@ -942,11 +954,8 @@ function ExportarInner() {
                           {/* COLUNA MINISTROS OU AVISO DE BLOQUEIO */}
                           <td className="p-1.5 border">
                             {isDayBlocked || isTimeBlocked ? (
-                              <div className="text-red-700 font-bold text-[10px] leading-tight">
-                                NÃO HAVERÁ MISSA
-                                <div className="text-[9px] text-red-600 font-normal">
-                                  Motivo: {block?.reason || "Não especificado"}
-                                </div>
+                              <div className="text-gray-500 italic text-[9px] leading-tight">
+                                Não haverá missa{block?.reason ? ` — ${block.reason}` : ""}
                               </div>
                             ) : (
                               <NamesRow nomes={nomesOrdenados} singleLine={pg.singleLine} />

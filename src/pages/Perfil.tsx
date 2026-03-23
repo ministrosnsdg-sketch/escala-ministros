@@ -4,6 +4,13 @@ import { Layout } from "../components/Layout";
 import { RequireAuth } from "../components/RequireAuth";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabaseClient";
+import {
+  isBiometricAvailable,
+  getBiometricLabel,
+  isBiometricEnabled,
+  setBiometricEnabled,
+  clearBiometricCredentials,
+} from "../lib/biometricHelpers";
 
 type MinisterProfile = {
   id: string;
@@ -262,246 +269,202 @@ const PerfilInner: React.FC = () => {
     );
   }
 
+  const initials = name.split(" ").slice(0,2).map(w=>w[0]||"").join("").toUpperCase();
+
   return (
-    <div className="max-w-3xl mx-auto mt-6 mb-10">
+    <div className="max-w-lg mx-auto">
+
       {/* Modal obrigatório para data de aniversário */}
       {showBirthdateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
-            <h2 className="text-lg font-semibold text-[#1f3c88] mb-2">
-              Complete seu cadastro
-            </h2>
-            <p className="text-[11px] text-gray-600 mb-4">
-              Para continuar, precisamos que você informe sua data de aniversário. 
-              Este dado é importante para a gestão da equipe.
-            </p>
-
-            <form onSubmit={handleSaveModalBirthdate}>
-              <div className="mb-4">
-                <label className="block text-[10px] text-gray-600 mb-1">
-                  Data de aniversário *
-                </label>
-                <input
-                  type="date"
-                  value={modalBirthDate}
-                  onChange={(e) => setModalBirthDate(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg text-[11px]"
-                  required
-                />
-              </div>
-
-              {modalError && (
-                <div className="mb-3 text-[10px] text-red-700 bg-red-50 border border-red-200 px-3 py-2 rounded">
-                  {modalError}
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full overflow-hidden">
+            <div className="bg-gradient-to-r from-[#1E3A6E] to-[#4A6FA5] px-5 py-4">
+              <h2 className="text-white font-bold text-base">Complete seu cadastro</h2>
+              <p className="text-blue-200 text-xs mt-0.5">Precisamos de mais um dado seu</p>
+            </div>
+            <div className="p-5">
+              <p className="text-sm text-gray-600 mb-4">
+                Informe sua data de aniversário para que a coordenação possa parabenizá-lo!
+              </p>
+              <form onSubmit={handleSaveModalBirthdate} className="space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5">Data de aniversário *</label>
+                  <input type="date" value={modalBirthDate} onChange={(e) => setModalBirthDate(e.target.value)}
+                    className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:border-[#4A6FA5] focus:outline-none" required />
                 </div>
-              )}
-
-              <div className="flex justify-end">
-                <button
-                  type="submit"
-                  disabled={savingModalBirthdate}
-                  className="px-4 py-2 rounded-full bg-[#1f3c88] text-white text-[10px] font-semibold hover:bg-[#182f6a] disabled:opacity-60"
-                >
+                {modalError && <div className="text-xs text-red-600 bg-red-50 border border-red-200 px-3 py-2 rounded-lg">{modalError}</div>}
+                <button type="submit" disabled={savingModalBirthdate}
+                  className="w-full py-3 rounded-xl bg-gradient-to-r from-[#2756A3] to-[#4A6FA5] text-white text-sm font-bold disabled:opacity-60 shadow-md shadow-blue-100">
                   {savingModalBirthdate ? "Salvando..." : "Salvar e continuar"}
                 </button>
-              </div>
-            </form>
+              </form>
+            </div>
           </div>
         </div>
       )}
 
-      <h1 className="text-xl font-semibold text-[#1f3c88] mb-1">
-        Meu Perfil
-      </h1>
-      <p className="text-[11px] text-gray-600 mb-4">
-        Visualize e atualize seus dados pessoais. Cada ministro gerencia apenas
-        as informações da sua própria conta.
-      </p>
-
       {loading ? (
-        <div className="text-[11px] text-gray-600">
-          Carregando informações...
-        </div>
+        <div className="flex items-center justify-center py-20 text-gray-400 text-sm">Carregando...</div>
       ) : (
         <>
           {profileError && (
-            <div className="mb-3 text-[10px] text-red-700 bg-red-50 border border-red-200 px-3 py-2 rounded">
-              {profileError}
-            </div>
+            <div className="mb-4 text-sm text-red-600 bg-red-50 border-2 border-red-200 px-3 py-2 rounded-xl">{profileError}</div>
           )}
 
-          {/* Bloco: dados da conta */}
           {minister && (
-            <>
-              <section className="bg-white border border-gray-200 rounded-2xl p-4 mb-4">
-                <h2 className="text-sm font-semibold text-gray-800 mb-3">
-                  Dados da conta
-                </h2>
+            <div className="space-y-4">
 
-                <div className="grid gap-3 text-[11px]">
-                  <div>
-                    <label className="block text-[10px] text-gray-600 mb-1">
-                      E-mail de acesso
-                    </label>
-                    <div className="px-3 py-2 border rounded-lg bg-gray-50 text-gray-800">
-                      {user.email || "—"}
-                    </div>
-                    <p className="mt-1 text-[9px] text-gray-500">
-                      O e-mail é gerenciado pela coordenação. Para alteração,
-                      entre em contato com um administrador.
-                    </p>
+              {/* Card de identidade */}
+              <div className="bg-gradient-to-br from-[#1E3A6E] to-[#4A6FA5] rounded-2xl p-5 text-white">
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center text-2xl font-bold text-white flex-shrink-0">
+                    {initials || "?"}
                   </div>
-
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] text-gray-600">
-                      Tipo de acesso:
-                    </span>
-                    <span className="px-2 py-0.5 rounded-full text-[9px] font-semibold bg-[#E6EEF9] text-[#1f3c88]">
-                      {minister.is_admin ? "Administrador" : "Ministro"}
+                  <div className="flex-1 min-w-0">
+                    <h1 className="text-lg font-bold truncate">{name || "Ministro"}</h1>
+                    <p className="text-blue-200 text-sm truncate">{user.email}</p>
+                    <span className="inline-block mt-1.5 px-2.5 py-0.5 bg-white/20 rounded-full text-xs font-semibold">
+                      {minister.is_admin ? "⭐ Administrador" : "🙏 Ministro"}
                     </span>
                   </div>
                 </div>
-              </section>
+              </div>
 
-              {/* Bloco: dados pessoais */}
-              <section className="bg-white border border-gray-200 rounded-2xl p-4 mb-4">
-                <h2 className="text-sm font-semibold text-gray-800 mb-3">
-                  Informações pessoais
-                </h2>
-
-                <form
-                  onSubmit={handleSaveProfile}
-                  className="space-y-3 text-[11px]"
-                >
+              {/* Informações pessoais */}
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
+                  <h2 className="text-sm font-bold text-[#1E3A6E]">Informações pessoais</h2>
+                </div>
+                <form onSubmit={handleSaveProfile} className="p-4 space-y-4">
                   <div>
-                    <label className="block text-[10px] text-gray-600 mb-1">
-                      Nome completo
-                    </label>
-                    <input
-                      type="text"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      className="w-full px-3 py-2 border rounded-lg text-[11px]"
-                      placeholder="Digite seu nome"
-                      required
-                    />
+                    <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">Nome completo</label>
+                    <input type="text" value={name} onChange={(e) => setName(e.target.value)}
+                      className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:border-[#4A6FA5] focus:outline-none"
+                      placeholder="Seu nome completo" required />
                   </div>
-
                   <div>
-                    <label className="block text-[10px] text-gray-600 mb-1">
-                      Data de aniversário
-                    </label>
-                    <input
-                      type="date"
-                      value={birthDate}
-                      onChange={(e) => setBirthDate(e.target.value)}
-                      className="w-full px-3 py-2 border rounded-lg text-[11px]"
-                    />
+                    <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">Data de aniversário</label>
+                    <input type="date" value={birthDate} onChange={(e) => setBirthDate(e.target.value)}
+                      className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:border-[#4A6FA5] focus:outline-none" />
                   </div>
-
                   <div>
-                    <label className="block text-[10px] text-gray-600 mb-1">
-                      Telefone / WhatsApp
-                    </label>
-                    <input
-                      type="tel"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      className="w-full px-3 py-2 border rounded-lg text-[11px]"
-                      placeholder="(00) 00000-0000"
-                    />
+                    <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">Telefone / WhatsApp</label>
+                    <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)}
+                      className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:border-[#4A6FA5] focus:outline-none"
+                      placeholder="(00) 00000-0000" />
                   </div>
-
                   {profileMessage && (
-                    <div className="text-[10px] text-green-700 bg-green-50 border border-green-200 px-3 py-1.5 rounded">
-                      {profileMessage}
-                    </div>
+                    <div className="text-sm text-green-700 bg-green-50 border border-green-200 px-3 py-2 rounded-xl">{profileMessage}</div>
                   )}
-
-                  <div className="flex justify-end">
-                    <button
-                      type="submit"
-                      disabled={savingProfile}
-                      className="px-4 py-1.5 rounded-full bg-[#1f3c88] text-white text-[10px] font-semibold hover:bg-[#182f6a] disabled:opacity-60"
-                    >
-                      {savingProfile ? "Salvando..." : "Salvar dados"}
-                    </button>
-                  </div>
+                  <button type="submit" disabled={savingProfile}
+                    className="w-full py-3 rounded-xl bg-gradient-to-r from-[#2756A3] to-[#4A6FA5] text-white text-sm font-bold disabled:opacity-60 shadow-sm">
+                    {savingProfile ? "Salvando..." : "Salvar dados"}
+                  </button>
                 </form>
-              </section>
+              </div>
 
-              {/* Bloco: alterar senha */}
-              <section className="bg-white border border-gray-200 rounded-2xl p-4">
-                <h2 className="text-sm font-semibold text-gray-800 mb-3">
-                  Segurança da conta
-                </h2>
-                <p className="text-[9px] text-gray-600 mb-3">
-                  Aqui você altera sua senha de acesso. Esta ação é pessoal
-                  e não pode ser realizada pelos administradores.
-                </p>
+              {/* E-mail (só leitura) */}
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
+                  <h2 className="text-sm font-bold text-[#1E3A6E]">Acesso</h2>
+                </div>
+                <div className="p-4">
+                  <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">E-mail de acesso</label>
+                  <div className="border-2 border-gray-100 bg-gray-50 rounded-xl px-3 py-2.5 text-sm text-gray-600">{user.email}</div>
+                  <p className="text-xs text-gray-400 mt-1.5">Para alterar o e-mail, fale com a coordenação.</p>
+                </div>
+              </div>
 
-                <form
-                  onSubmit={handleChangePassword}
-                  className="space-y-3 text-[11px]"
-                >
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div>
-                      <label className="block text-[10px] text-gray-600 mb-1">
-                        Nova senha
-                      </label>
-                      <input
-                        type="password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        className="w-full px-3 py-2 border rounded-lg text-[11px]"
-                        placeholder="Mínimo 6 caracteres"
-                      />
-                    </div>
+              {/* Segurança */}
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
+                  <h2 className="text-sm font-bold text-[#1E3A6E]">Segurança</h2>
+                </div>
 
-                    <div>
-                      <label className="block text-[10px] text-gray-600 mb-1">
-                        Confirmar nova senha
-                      </label>
-                      <input
-                        type="password"
-                        value={passwordConfirm}
-                        onChange={(e) =>
-                          setPasswordConfirm(e.target.value)
-                        }
-                        className="w-full px-3 py-2 border rounded-lg text-[11px]"
-                        placeholder="Repita a nova senha"
-                      />
-                    </div>
+                {/* Biometria toggle */}
+                {isBiometricAvailable() && (
+                  <BiometricToggle onMessage={(msg) => { setProfileMessage(msg); setTimeout(() => setProfileMessage(null), 4000); }} />
+                )}
+
+                <form onSubmit={handleChangePassword} className="p-4 space-y-4">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">Nova senha</label>
+                    <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
+                      className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:border-[#4A6FA5] focus:outline-none"
+                      placeholder="Mínimo 6 caracteres" />
                   </div>
-
-                  {passwordMessage && (
-                    <div className="text-[10px] text-green-700 bg-green-50 border border-green-200 px-3 py-1.5 rounded">
-                      {passwordMessage}
-                    </div>
-                  )}
-                  {passwordError && (
-                    <div className="text-[10px] text-red-700 bg-red-50 border border-red-200 px-3 py-1.5 rounded">
-                      {passwordError}
-                    </div>
-                  )}
-
-                  <div className="flex justify-end">
-                    <button
-                      type="submit"
-                      disabled={savingPassword}
-                      className="px-4 py-1.5 rounded-full border border-[#1f3c88] text-[#1f3c88] text-[10px] font-semibold hover:bg-[#E6EEF9] disabled:opacity-60"
-                    >
-                      {savingPassword ? "Alterando..." : "Alterar senha"}
-                    </button>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">Confirmar senha</label>
+                    <input type="password" value={passwordConfirm} onChange={(e) => setPasswordConfirm(e.target.value)}
+                      className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:border-[#4A6FA5] focus:outline-none"
+                      placeholder="Repita a nova senha" />
                   </div>
+                  {passwordMessage && <div className="text-sm text-green-700 bg-green-50 border border-green-200 px-3 py-2 rounded-xl">{passwordMessage}</div>}
+                  {passwordError && <div className="text-sm text-red-600 bg-red-50 border border-red-200 px-3 py-2 rounded-xl">{passwordError}</div>}
+                  <button type="submit" disabled={savingPassword}
+                    className="w-full py-3 rounded-xl border-2 border-[#4A6FA5] text-[#4A6FA5] text-sm font-bold hover:bg-[#EEF4FF] disabled:opacity-60 transition-colors">
+                    {savingPassword ? "Alterando..." : "Alterar senha"}
+                  </button>
                 </form>
-              </section>
-            </>
+              </div>
+
+            </div>
           )}
         </>
       )}
     </div>
   );
 };
+
+// Componente isolado com state próprio para reatividade do toggle
+function BiometricToggle({ onMessage }: { onMessage: (msg: string) => void }) {
+  const [enabled, setEnabled] = useState(isBiometricEnabled());
+  const label = getBiometricLabel();
+
+  const handleToggle = () => {
+    if (enabled) {
+      clearBiometricCredentials();
+      setBiometricEnabled(false);
+      setEnabled(false);
+      onMessage(`${label} desativado. Faça login novamente com e-mail e senha para reativar.`);
+    } else {
+      setBiometricEnabled(true);
+      setEnabled(true);
+      onMessage(`${label} será ativado no próximo login com e-mail e senha.`);
+    }
+  };
+
+  return (
+    <div className="px-4 py-4 border-b border-gray-100">
+      <div className="flex items-center justify-between">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-lg">🔐</span>
+            <div>
+              <p className="text-sm font-semibold text-gray-800">{label}</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                {enabled
+                  ? "Ativado — entre no sistema usando biometria"
+                  : "Desativado — entre sempre com e-mail e senha"}
+              </p>
+            </div>
+          </div>
+        </div>
+        <button
+          onClick={handleToggle}
+          className={`ml-3 relative inline-flex h-7 w-12 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+            enabled ? "bg-[#4A6FA5]" : "bg-gray-200"
+          }`}
+        >
+          <span
+            className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+              enabled ? "translate-x-5" : "translate-x-0"
+            }`}
+          />
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default PerfilPage;

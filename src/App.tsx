@@ -9,6 +9,7 @@ import Escala from "./pages/Escala";
 import Exportar from "./pages/Exportar";
 import Relatorios from "./pages/Relatorios";
 import Perfil from "./pages/Perfil";
+import TrocaEscala from "./pages/TrocaEscala";
 
 export default function App() {
   return (
@@ -23,6 +24,7 @@ export default function App() {
         <Route path="/exportar" element={<Exportar />} />
         <Route path="/relatorios" element={<Relatorios />} />
         <Route path="/perfil" element={<Perfil />} />
+        <Route path="/troca" element={<TrocaEscala />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </AuthProvider>

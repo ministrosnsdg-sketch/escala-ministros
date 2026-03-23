@@ -294,7 +294,7 @@ if (exists) {
   if (loading) {
     return (
       <div className="max-w-4xl mx-auto">
-        <h2 className="text-lg font-semibold mb-3 text-[#4A6FA5]">
+        <h2 className="text-xl font-bold mb-3 text-[#4A6FA5]">
           Ministros
         </h2>
         <p className="text-sm text-gray-600">Carregando ministros...</p>
@@ -305,7 +305,7 @@ if (exists) {
   if (!isAdmin) {
     return (
       <div className="max-w-3xl mx-auto">
-        <h2 className="text-lg font-semibold mb-3 text-[#4A6FA5]">
+        <h2 className="text-xl font-bold mb-3 text-[#4A6FA5]">
           Ministros
         </h2>
         <p className="text-sm text-gray-700">
@@ -318,69 +318,50 @@ if (exists) {
 
   return (
     <div className="max-w-5xl mx-auto">
-      <h2 className="text-lg font-semibold mb-3 text-[#4A6FA5]">
-        Ministros - Administração
-      </h2>
-      {/* Estatísticas de ministros */}
-<div className="mb-3 flex gap-3 text-[11px]">
-  <div className="flex-1 bg-white border border-gray-200 rounded-lg p-2 text-center">
-    <p className="text-[#4A6FA5] font-semibold">{totalAtivos}</p>
-    <p className="text-gray-600 text-[10px]">Ativos</p>
-  </div>
-
-  <div className="flex-1 bg-white border border-gray-200 rounded-lg p-2 text-center">
-    <p className="text-red-600 font-semibold">{totalInativos}</p>
-    <p className="text-gray-600 text-[10px]">Inativos</p>
-  </div>
-</div>
+      <h2 className="text-xl font-bold text-[#1E3A6E] mb-1">Ministros</h2>
+      <p className="text-sm text-gray-500 mb-4">Gerencie os ministros cadastrados.</p>
+            {/* Stats */}
+      <div className="grid grid-cols-2 gap-3 mb-4">
+        <div className="bg-gradient-to-br from-[#EEF4FF] to-white border border-[#D6E6F7] rounded-2xl p-3 text-center">
+          <p className="text-2xl font-bold text-[#4A6FA5]">{totalAtivos}</p>
+          <p className="text-xs text-gray-500 mt-0.5">Ativos</p>
+        </div>
+        <div className="bg-gradient-to-br from-red-50 to-white border border-red-100 rounded-2xl p-3 text-center">
+          <p className="text-2xl font-bold text-red-500">{totalInativos}</p>
+          <p className="text-xs text-gray-500 mt-0.5">Inativos</p>
+        </div>
+      </div>
 
 
-      <p className="text-[11px] text-gray-700 mb-3">
+      <p className="text-sm text-gray-600 mb-3">
         Ao cadastrar um novo ministro, o sistema cria automaticamente o usuário
         com senha inicial <strong>123456</strong> e marca para redefinir no
         primeiro login.
       </p>
 
       {error && (
-        <div className="mb-3 text-sm text-red-600 bg-red-50 border border-red-200 px-3 py-2 rounded">
+        <div className="mb-3 text-sm text-red-600 bg-red-50 border-2 border-red-200 px-3 py-2 rounded-lg">
           {error}
         </div>
       )}
+      <div className="flex gap-2 mb-4">
+        <input type="text" placeholder="Buscar ministro..." className="flex-1 border-2 border-gray-200 rounded-xl px-3 py-2 text-sm focus:border-[#4A6FA5] focus:outline-none" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+        <button onClick={() => { setShowNewModal(true); setError(null); }} className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#2756A3] to-[#4A6FA5] text-white text-sm font-bold flex-shrink-0">
+          + Novo
+        </button>
+      </div>
 
-      <div className="mb-3 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
-  
-  <input
-    type="text"
-    placeholder="Buscar ministro..."
-    className="border rounded px-2 py-1 text-[11px] w-full sm:w-64"
-    value={searchTerm}
-    onChange={(e) => setSearchTerm(e.target.value)}
-  />
-
-  <button
-    onClick={() => {
-      setShowNewModal(true);
-      setError(null);
-    }}
-    className="px-3 py-1.5 text-xs rounded bg-[#4A6FA5] text-white hover:bg-[#3F5F8F]"
-  >
-    Novo Ministro
-  </button>
-</div>
-
-
-      <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+      <div className="bg-white border-2 border-gray-200 rounded-lg overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
-          <table className="min-w-full text-[11px]">
-          <thead className="bg-[#D6E6F7] text-[#3F5F8F]">
+          <table className="min-w-full text-sm">
+          <thead className="bg-gradient-to-r from-[#1E3A6E] to-[#4A6FA5] text-white text-xs">
             <tr>
-              <th className="px-2 py-2 text-left">Nome</th>
-              <th className="px-2 py-2 text-left">E-mail</th>
-              <th className="px-2 py-2 text-left">Telefone</th>
-              <th className="px-2 py-2 text-center">Admin</th>
-              <th className="px-2 py-2 text-center">Ativo</th>
-              <th className="px-2 py-2 text-center">1º acesso</th>
-              <th className="px-2 py-2 text-center">Ações</th>
+              <th className="px-3 py-3 text-left font-semibold">Nome</th>
+              <th className="px-3 py-3 text-left font-semibold hidden sm:table-cell">E-mail</th>
+              <th className="px-3 py-3 text-center font-semibold">Admin</th>
+              <th className="px-3 py-3 text-center font-semibold">Ativo</th>
+              <th className="px-3 py-3 text-center font-semibold">1º acesso</th>
+              <th className="px-3 py-3 text-center font-semibold">Ação</th>
             </tr>
           </thead>
           <tbody>
@@ -397,24 +378,23 @@ if (exists) {
                   (!m.active ? "bg-gray-50 text-gray-400" : "")
                 }
               >
-                <td className="px-2 py-1">{m.name}</td>
-                <td className="px-2 py-1">{m.email || "-"}</td>
-                <td className="px-2 py-1">{m.phone || "-"}</td>
-                <td className="px-2 py-1 text-center">
-                  {m.is_admin ? "Sim" : "Não"}
+                <td className="px-3 py-2.5 font-medium text-gray-800">{m.name}</td>
+                <td className="px-3 py-2.5 text-gray-500 text-xs hidden sm:table-cell">{m.email || "-"}</td>
+                <td className="px-3 py-2.5 text-center text-xs">
+                  {m.is_admin ? <span className="text-xs bg-blue-100 text-blue-700 font-semibold px-2 py-0.5 rounded-full">Sim</span> : <span className="text-xs text-gray-400">—</span>}
                 </td>
-                <td className="px-2 py-1 text-center">
-                  {m.active ? "Sim" : "Não"}
+                <td className="px-3 py-2.5 text-center">
+                  {m.active ? <span className="text-xs bg-green-100 text-green-700 font-semibold px-2 py-0.5 rounded-full">Ativo</span> : <span className="text-xs bg-gray-100 text-gray-500 font-semibold px-2 py-0.5 rounded-full">Inativo</span>}
                 </td>
-                <td className="px-2 py-1 text-center">
-                  {m.must_reset_password ? "Pendente" : "OK"}
+                <td className="px-3 py-2.5 text-center">
+                  {m.must_reset_password ? <span className="text-xs bg-amber-100 text-amber-700 font-semibold px-2 py-0.5 rounded-full">Pendente</span> : <span className="text-xs text-gray-400">OK</span>}
                 </td>
                 <td className="px-2 py-1 text-center">
                   {/* EDITAR – só aparece se não for o superadmin */}
 {m.email !== SUPERADMIN_EMAIL && (
   <button
     onClick={() => openEdit(m)}
-    className="px-2 py-0.5 border rounded text-[9px] hover:bg-gray-50"
+    className="px-3 py-1 border-2 rounded-lg text-xs font-medium hover:bg-gray-50"
   >
     Editar
   </button>
@@ -431,13 +411,13 @@ if (exists) {
       {/* Modal: Novo Ministro */}
       {showNewModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-lg w-full max-w-md border border-[#D6E6F7] p-4">
-            <h3 className="text-sm font-semibold text-[#4A6FA5] mb-2">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md border border-gray-100 p-5">
+            <h3 className="text-base font-bold text-[#1E3A6E] mb-4">
               Novo Ministro
             </h3>
             <div className="space-y-2 mb-3">
               <div>
-                <label className="block text-[10px] text-gray-600 mb-1">
+                <label className="block text-sm text-gray-600 mb-1">
                   Nome completo *
                 </label>
                 <input
@@ -448,7 +428,7 @@ if (exists) {
                 />
               </div>
               <div>
-                <label className="block text-[10px] text-gray-600 mb-1">
+                <label className="block text-sm text-gray-600 mb-1">
                   E-mail *
                 </label>
                 <input
@@ -459,7 +439,7 @@ if (exists) {
                 />
               </div>
               <div>
-                <label className="block text-[10px] text-gray-600 mb-1">
+                <label className="block text-sm text-gray-600 mb-1">
                   Data de aniversário *
                 </label>
                 <input
@@ -471,7 +451,7 @@ if (exists) {
                 />
               </div>
               <div>
-                <label className="block text-[10px] text-gray-600 mb-1">
+                <label className="block text-sm text-gray-600 mb-1">
                   Telefone (opcional)
                 </label>
                 <input
@@ -491,14 +471,14 @@ if (exists) {
                   setNewPhone("");
                   setNewBirthDate("");
                 }}
-                className="px-3 py-1 text-[10px] rounded border border-gray-300 hover:bg-gray-50"
+                className="px-3 py-1 text-sm rounded border border-gray-300 hover:bg-gray-50"
                 disabled={saving}
               >
                 Cancelar
               </button>
               <button
                 onClick={handleCreate}
-                className="px-3 py-1 text-[10px] rounded bg-[#4A6FA5] text-white hover:bg-[#3F5F8F] disabled:opacity-60"
+                className="px-3 py-1 text-sm rounded bg-[#4A6FA5] text-white hover:bg-[#3F5F8F] disabled:opacity-60"
                 disabled={saving}
               >
                 {saving ? "Criando..." : "Salvar"}
@@ -511,13 +491,13 @@ if (exists) {
       {/* Modal: Editar Ministro */}
       {showEditModal && editMinister && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-lg w-full max-w-md border border-[#D6E6F7] p-4">
-            <h3 className="text-sm font-semibold text-[#4A6FA5] mb-2">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md border border-gray-100 p-5">
+            <h3 className="text-base font-bold text-[#1E3A6E] mb-4">
               Editar Ministro
             </h3>
             <div className="space-y-2 mb-3">
               <div>
-                <label className="block text-[10px] text-gray-600 mb-1">
+                <label className="block text-sm text-gray-600 mb-1">
                   Nome completo *
                 </label>
                 <input
@@ -528,7 +508,7 @@ if (exists) {
                 />
               </div>
               <div>
-                <label className="block text-[10px] text-gray-600 mb-1">
+                <label className="block text-sm text-gray-600 mb-1">
                   E-mail *
                 </label>
                 <input
@@ -539,7 +519,7 @@ if (exists) {
                 />
               </div>
               <div>
-                <label className="block text-[10px] text-gray-600 mb-1">
+                <label className="block text-sm text-gray-600 mb-1">
                   Data de aniversário *
                 </label>
                 <input
@@ -551,7 +531,7 @@ if (exists) {
                 />
               </div>
               <div>
-                <label className="block text-[10px] text-gray-600 mb-1">
+                <label className="block text-sm text-gray-600 mb-1">
                   Telefone
                 </label>
                 <input
@@ -562,7 +542,7 @@ if (exists) {
                 />
               </div>
               <div className="flex items-center justify-between gap-3 mt-2">
-                <label className="flex items-center gap-1 text-[10px] text-gray-700">
+                <label className="flex items-center gap-1 text-sm text-gray-700">
                   <input
                     type="checkbox"
                     checked={editIsAdmin}
@@ -570,7 +550,7 @@ if (exists) {
                   />
                   Administrador
                 </label>
-                <label className="flex items-center gap-1 text-[10px] text-gray-700">
+                <label className="flex items-center gap-1 text-sm text-gray-700">
                   <input
                     type="checkbox"
                     checked={editActive}
@@ -585,7 +565,7 @@ if (exists) {
 {editMinister?.email !== SUPERADMIN_EMAIL && (
   <button
     onClick={handleDelete}
-    className="px-2 py-1 text-[9px] rounded border border-red-300 text-red-600 hover:bg-red-50"
+    className="px-3 py-2 text-sm rounded-lg border border-red-300 text-red-600 hover:bg-red-50 font-medium"
     disabled={saving}
   >
     Excluir ministro
@@ -597,14 +577,14 @@ if (exists) {
                     setShowEditModal(false);
                     setEditMinister(null);
                   }}
-                  className="px-3 py-1 text-[10px] rounded border border-gray-300 hover:bg-gray-50"
+                  className="px-3 py-1 text-sm rounded border border-gray-300 hover:bg-gray-50"
                   disabled={saving}
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={handleEditSave}
-                  className="px-3 py-1 text-[10px] rounded bg-[#4A6FA5] text-white hover:bg-[#3F5F8F] disabled:opacity-60"
+                  className="px-3 py-1 text-sm rounded bg-[#4A6FA5] text-white hover:bg-[#3F5F8F] disabled:opacity-60"
                   disabled={saving}
                 >
                   {saving ? "Salvando..." : "Salvar"}

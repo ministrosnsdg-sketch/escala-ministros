@@ -10,8 +10,9 @@ import ResumoPorMinistro from "./relatorios/ResumoPorMinistro";
 // 🆕 IMPORTAR O NOVO RELATÓRIO
 import BloqueiosDeMissas from "./relatorios/BloqueiosDeMissas";
 import Aniversariantes from "./relatorios/Aniversariantes";
+import NotificacoesAdmin from "./relatorios/NotificacoesAdmin";
 
-type TabKey = "coverage" | "codes" | "settings" | "ranking" | "blocked" | "birthdays";
+type TabKey = "coverage" | "codes" | "settings" | "ranking" | "blocked" | "birthdays" | "notifications";
 
 export default function RelatoriosPage() {
   const [activeTab, setActiveTab] = useState<TabKey>("coverage");
@@ -23,18 +24,15 @@ export default function RelatoriosPage() {
           {/* Cabeçalho */}
           <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-2">
             <div>
-              <h2 className="text-lg font-semibold text-[#4A6FA5]">
+              <h2 className="text-xl font-bold text-[#4A6FA5]">
                 Relatórios & Administração
               </h2>
-              <p className="text-[10px] text-gray-700">
-                Painel interno da coordenação: cobertura, bloqueios, códigos,
-                janela de edição e resumo por ministro.
-              </p>
+              <p className="text-xs text-gray-500 mt-0.5">Painel interno da coordenação</p>
             </div>
           </div>
 
           {/* Abas */}
-          <div className="flex flex-wrap gap-1 text-[11px]">
+          <div className="flex flex-wrap gap-1 text-sm">
             <TabButton
               label="Cobertura de horários"
               active={activeTab === "coverage"}
@@ -70,6 +68,12 @@ export default function RelatoriosPage() {
               active={activeTab === "birthdays"}
               onClick={() => setActiveTab("birthdays")}
             />
+
+            <TabButton
+              label="Notificações"
+              active={activeTab === "notifications"}
+              onClick={() => setActiveTab("notifications")}
+            />
           </div>
 
           {/* Conteúdo da aba */}
@@ -79,6 +83,7 @@ export default function RelatoriosPage() {
           {activeTab === "settings" && <DisponibilidadeJanelaConfig />}
           {activeTab === "ranking" && <ResumoPorMinistro />}
           {activeTab === "birthdays" && <Aniversariantes />}
+          {activeTab === "notifications" && <NotificacoesAdmin />}
         </div>
       </Layout>
     </RequireAuth>
@@ -97,11 +102,7 @@ function TabButton({
   return (
     <button
       onClick={onClick}
-      className={`px-3 py-1.5 rounded-full border transition ${
-        active
-          ? "bg-[#4A6FA5] text-white border-[#4A6FA5]"
-          : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
-      }`}
+      className={`px-3 py-2 rounded-xl text-sm font-medium transition-all ${active ? "bg-[#4A6FA5] text-white shadow-sm" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
     >
       {label}
     </button>
