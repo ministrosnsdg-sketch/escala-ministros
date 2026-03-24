@@ -1,38 +1,50 @@
 // ============ PUSH NOTIFICATION HELPERS ============
-// Para funcionar com push real, é necessário:
-// 1. Criar projeto no Firebase Console
-// 2. Colocar VITE_FIREBASE_VAPID_KEY no .env.local
-// 3. Criar Edge Functions no Supabase para disparar
+// Fluxo real de Web Push (sem Firebase):
+//   1. O usuário concede permissão
+//   2. O navegador gera uma PushSubscription usando a VAPID_PUBLIC_KEY
+//   3. O token (subscription JSON) é salvo na tabela push_tokens do Supabase
+//      — cada dispositivo tem sua própria linha (identificado pelo endpoint)
+//   4. Quando o admin envia uma notificação, o frontend chama a Edge Function send-push
+//   5. A Edge Function dispara o push para cada token via Web Push Protocol
 //
-// Por enquanto, funciona com Notification API local (PWA aberta)
-// e fica pronto para conectar ao Firebase quando configurado.
+// Variável necessária no .env.local:
+//   VITE_VAPID_PUBLIC_KEY=<sua chave pública VAPID>
+//
+// Para gerar as chaves VAPID, rode no terminal:
+//   npx web-push generate-vapid-keys
+// Guarde a PUBLIC_KEY no .env.local e ambas no painel do Supabase como secrets.
 
-import { isPWA } from "./biometricHelpers";
 import { supabase } from "./supabaseClient";
 
-const PUSH_TOKEN_KEY = "push_token";
 const PUSH_PERMISSION_ASKED = "push_permission_asked";
 
-/** Verifica se push notifications são suportadas (só em PWA) */
+/** Verifica se push notifications são suportadas neste navegador/dispositivo */
 export function isPushSupported(): boolean {
-  if (!isPWA()) return false;
-  return "Notification" in window && "serviceWorker" in navigator;
+  // Funciona em Chrome/Edge/Firefox no Android, Chrome/Edge no Desktop
+  // iOS Safari 16.4+ com PWA instalada também suporta
+  return (
+    "Notification" in window &&
+    "serviceWorker" in navigator &&
+    "PushManager" in window
+  );
 }
 
-/** Verifica se já tem permissão */
+/** Verifica a permissão atual */
 export function getPushPermission(): NotificationPermission | "unsupported" {
   if (!isPushSupported()) return "unsupported";
   return Notification.permission;
 }
 
-/** Verifica se já perguntamos ao usuário */
+/** Verifica se já perguntamos ao usuário neste dispositivo */
 export function wasPushAsked(): boolean {
   try {
     return localStorage.getItem(PUSH_PERMISSION_ASKED) === "true";
-  } catch { return false; }
+  } catch {
+    return false;
+  }
 }
 
-/** Solicita permissão de notificação */
+/** Solicita permissão de notificação e registra o token do dispositivo */
 export async function requestPushPermission(): Promise<boolean> {
   if (!isPushSupported()) return false;
 
@@ -41,7 +53,6 @@ export async function requestPushPermission(): Promise<boolean> {
     const permission = await Notification.requestPermission();
 
     if (permission === "granted") {
-      // Registrar token no banco para push futuro via Firebase
       await registerPushToken();
       return true;
     }
@@ -51,45 +62,102 @@ export async function requestPushPermission(): Promise<boolean> {
   }
 }
 
-/** Registra o push token do dispositivo no banco */
-async function registerPushToken() {
+/**
+ * Registra (ou atualiza) o push token deste dispositivo no Supabase.
+ * Cada dispositivo tem sua própria linha — identificado pelo endpoint único da subscription.
+ * Isso garante que usuários com múltiplos dispositivos recebam em todos.
+ */
+export async function registerPushToken(): Promise<boolean> {
   try {
+    const vapidKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
+    if (!vapidKey) {
+      console.warn("[Push] VITE_VAPID_PUBLIC_KEY não configurada no .env.local");
+      return false;
+    }
+
     const registration = await navigator.serviceWorker.ready;
 
-    // Tentar Web Push (funciona sem Firebase para notificações locais)
-    // Quando Firebase for configurado, usar messaging.getToken() aqui
-    const subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(
-        import.meta.env.VITE_FIREBASE_VAPID_KEY || "placeholder"
-      ),
-    }).catch(() => null);
+    // Verifica se já existe uma subscription ativa neste browser/dispositivo
+    let subscription = await registration.pushManager.getSubscription();
 
-    if (subscription) {
-      const token = JSON.stringify(subscription);
-      localStorage.setItem(PUSH_TOKEN_KEY, token);
+    // Se não existe, cria uma nova
+    if (!subscription) {
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(vapidKey),
+      });
+    }
 
-      // Salvar no banco vinculado ao usuário
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        await supabase.from("push_tokens").upsert({
+    const token = JSON.stringify(subscription);
+    const endpoint = subscription.endpoint; // identificador único por dispositivo/browser
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) return false;
+
+    // Tenta upsert por endpoint (cada dispositivo = uma linha)
+    const { error } = await supabase.from("push_tokens").upsert(
+      {
+        user_id: user.id,
+        token,
+        endpoint,
+        platform: getPlatform(),
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "endpoint" }
+    );
+
+    if (error) {
+      // Fallback para schema antigo sem coluna endpoint
+      await supabase.from("push_tokens").upsert(
+        {
           user_id: user.id,
           token,
           platform: getPlatform(),
           updated_at: new Date().toISOString(),
-        }, { onConflict: "user_id" }).catch(() => {});
-      }
+        },
+        { onConflict: "user_id" }
+      );
     }
-  } catch {}
+
+    return true;
+  } catch (err) {
+    console.error("[Push] Erro ao registrar token:", err);
+    return false;
+  }
 }
 
-/** Envia notificação local (quando o app está aberto como PWA) */
+/**
+ * Chama a Edge Function do Supabase para disparar push para todos os dispositivos.
+ */
+export async function sendPushViaEdgeFunction(
+  title: string,
+  message: string,
+  target: "all" | "admins",
+  notificationId: string
+): Promise<{ sent: number; total: number; error?: string }> {
+  try {
+    const { data, error } = await supabase.functions.invoke("send-push", {
+      body: { title, message, target, notificationId },
+    });
+
+    if (error) throw error;
+    return data as { sent: number; total: number };
+  } catch (err: any) {
+    console.error("[Push] Erro ao chamar Edge Function:", err);
+    return { sent: 0, total: 0, error: err.message || "Erro desconhecido" };
+  }
+}
+
+/** Envia notificação local (quando o app está aberto em foreground) */
 export function sendLocalNotification(title: string, body: string, tag?: string) {
   if (!isPushSupported()) return;
   if (Notification.permission !== "granted") return;
 
   try {
-    navigator.serviceWorker.ready.then(reg => {
+    navigator.serviceWorker.ready.then((reg) => {
       reg.showNotification(title, {
         body,
         icon: "/icons/icon-192x192.png",
@@ -100,6 +168,16 @@ export function sendLocalNotification(title: string, body: string, tag?: string)
       });
     });
   } catch {}
+}
+
+/**
+ * Re-registra o token se a permissão já foi concedida.
+ * Deve ser chamado no login para manter o token atualizado.
+ */
+export async function refreshPushTokenIfGranted(): Promise<void> {
+  if (!isPushSupported()) return;
+  if (Notification.permission !== "granted") return;
+  await registerPushToken();
 }
 
 function getPlatform(): string {

@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { supabase } from "../lib/supabaseClient";
 import { isPWA } from "../lib/biometricHelpers";
-import { isPushSupported, getPushPermission, wasPushAsked, requestPushPermission } from "../lib/pushHelpers";
+import { isPushSupported, getPushPermission, wasPushAsked, requestPushPermission, refreshPushTokenIfGranted } from "../lib/pushHelpers";
 
 interface MenuItem {
   path: string;
@@ -38,7 +38,8 @@ export function Layout({ children }: { children: ReactNode }) {
   const [showBirthBanner, setShowBirthBanner] = useState(false);
   const [pendingSwaps, setPendingSwaps] = useState(0);
   const [showMondayReminder, setShowMondayReminder] = useState(false);
-  const [birthdayNames, setBirthdayNames] = useState<string[]>([]);
+  const [birthdayList, setBirthdayList] = useState<{name: string; day: number}[]>([]);
+  const [showBirthdayModal, setShowBirthdayModal] = useState(false);
   const [activeNotifications, setActiveNotifications] = useState<{id: string; title: string; message: string}[]>([]);
   const [dismissedNotifs, setDismissedNotifs] = useState<Set<string>>(new Set());
   const [showPushBanner, setShowPushBanner] = useState(false);
@@ -62,9 +63,13 @@ export function Layout({ children }: { children: ReactNode }) {
       } else {
         setIsAdmin(!!data?.is_admin);
         setDisplayName(data?.name || user.email || "Usuário");
-        // Verificar se precisa preencher data de aniversário
+        // Se não tem data de aniversário, redirecionar direto para o perfil
         if (data && !data.birth_date) {
           setShowBirthBanner(true);
+          // Redirecionar para o perfil se não está lá ainda
+          if (window.location.pathname !== "/perfil") {
+            navigate("/perfil", { replace: true });
+          }
         }
         // Verificar trocas pendentes
         if (data?.id) {
@@ -89,9 +94,17 @@ export function Layout({ children }: { children: ReactNode }) {
     (async () => {
       const now = new Date();
 
-      // Push: perguntar permissão em PWA (uma vez)
-      if (isPushSupported() && getPushPermission() === "default" && !wasPushAsked()) {
-        if (!cancelled) setShowPushBanner(true);
+      // Push: mostrar banner em qualquer navegador que suporte (não só PWA)
+      // Se já concedeu, atualiza o token silenciosamente
+      if (isPushSupported()) {
+        const perm = getPushPermission();
+        if (perm === "granted") {
+          // Token já concedido — re-registra para manter atualizado
+          refreshPushTokenIfGranted();
+        } else if (perm === "default" && !wasPushAsked()) {
+          // Ainda não perguntamos — mostrar banner
+          if (!cancelled) setShowPushBanner(true);
+        }
       }
 
       // Segunda-feira: lembrar de preencher escala
@@ -102,7 +115,7 @@ export function Layout({ children }: { children: ReactNode }) {
         }
       }
 
-      // Aniversariantes do mês
+      // Aniversariantes do mês (com dia)
       const currentMonth = now.getMonth() + 1;
       const { data: bdays } = await supabase
         .from("ministers")
@@ -110,14 +123,27 @@ export function Layout({ children }: { children: ReactNode }) {
         .not("birth_date", "is", null);
 
       if (!cancelled && bdays) {
-        const names = bdays
+        const list = bdays
           .filter((m: any) => {
             if (!m.birth_date) return false;
             const parts = m.birth_date.split("-");
             return parseInt(parts[1]) === currentMonth;
           })
-          .map((m: any) => m.name);
-        setBirthdayNames(names);
+          .map((m: any) => {
+            const day = parseInt(m.birth_date.split("-")[2]);
+            return { name: m.name, day };
+          })
+          .sort((a: any, b: any) => a.day - b.day);
+
+        setBirthdayList(list);
+
+        // Mostrar modal só uma vez por sessão
+        if (list.length > 0) {
+          const dismissed = sessionStorage.getItem("birthday_modal_dismissed");
+          if (!dismissed) {
+            if (!cancelled) setShowBirthdayModal(true);
+          }
+        }
       }
 
       // Notificações manuais do admin (ativas, não agendadas para o futuro)
@@ -379,13 +405,45 @@ export function Layout({ children }: { children: ReactNode }) {
         </div>
       )}
 
-      {birthdayNames.length > 0 && (
-        <div className="max-w-7xl mx-auto px-3 pt-2">
-          <div className="bg-pink-50 border border-pink-200 rounded-xl px-4 py-3 flex items-center gap-3">
-            <span className="text-lg flex-shrink-0">🎂</span>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-pink-800">Aniversariantes do mês</p>
-              <p className="text-xs text-pink-600 truncate">{birthdayNames.join(", ")}</p>
+      {/* MODAL ANIVERSARIANTES DO MÊS */}
+      {showBirthdayModal && birthdayList.length > 0 && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-lg max-w-sm w-full overflow-hidden">
+            <div className="bg-gradient-to-r from-pink-500 to-pink-400 px-5 py-4 text-center">
+              <p className="text-3xl mb-1">🎂</p>
+              <h2 className="text-white font-bold text-base">Aniversariantes do Mês</h2>
+              <p className="text-pink-100 text-xs mt-0.5">
+                {new Date().toLocaleString("pt-BR", { month: "long" }).replace(/^\w/, c => c.toUpperCase())} de {new Date().getFullYear()}
+              </p>
+            </div>
+            <div className="p-4 max-h-[50vh] overflow-y-auto">
+              <div className="space-y-2">
+                {birthdayList.map((b, i) => (
+                  <div key={i} className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-pink-50">
+                    <div className="w-10 h-10 rounded-full bg-pink-100 flex items-center justify-center flex-shrink-0">
+                      <span className="text-sm font-bold text-pink-600">
+                        {String(b.day).padStart(2, "0")}
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-800 truncate">{b.name}</p>
+                      <p className="text-xs text-pink-500">Dia {b.day}</p>
+                    </div>
+                    <span className="text-lg flex-shrink-0">🎉</span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-gray-400 text-center mt-3 italic">
+                Que Deus abençoe nossos aniversariantes!
+              </p>
+            </div>
+            <div className="px-4 pb-4">
+              <button
+                onClick={() => { setShowBirthdayModal(false); sessionStorage.setItem("birthday_modal_dismissed", "true"); }}
+                className="w-full py-2.5 rounded-xl bg-pink-500 text-white text-sm font-semibold hover:bg-pink-600 transition-colors"
+              >
+                Fechar
+              </button>
             </div>
           </div>
         </div>
