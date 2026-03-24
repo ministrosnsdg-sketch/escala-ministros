@@ -342,6 +342,17 @@ export default function NotificacoesAdmin() {
         </p>
       </div>
 
+      {/* 🔕 AVISO DE MANUTENÇÃO — remover quando reativar */}
+      <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 flex items-start gap-3">
+        <span className="text-xl mt-0.5">🔕</span>
+        <div>
+          <p className="text-sm font-bold text-amber-800">Notificações push temporariamente desativadas</p>
+          <p className="text-xs text-amber-700 mt-0.5">
+            O envio de notificações está pausado para manutenção. O histórico e as configurações estão preservados.
+          </p>
+        </div>
+      </div>
+
       {feedback && (
         <div className={`text-sm px-4 py-3 rounded-2xl flex items-center gap-2 ${
           feedback.type === "ok"

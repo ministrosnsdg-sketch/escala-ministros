@@ -146,23 +146,23 @@ export function Layout({ children }: { children: ReactNode }) {
         }
       }
 
-      // Notificações manuais do admin (ativas, não agendadas para o futuro)
-      try {
-        const { data: notifs } = await supabase
-          .from("admin_notifications")
-          .select("id, title, message, scheduled_at, target")
-          .eq("sent", true)
-          .order("created_at", { ascending: false })
-          .limit(5);
-
-        if (!cancelled && notifs) {
-          const active = notifs.filter((n: any) => {
-            if (n.scheduled_at && new Date(n.scheduled_at) > now) return false;
-            return true;
-          });
-          setActiveNotifications(active);
-        }
-      } catch {}
+      // 🔕 Notificações manuais do admin — temporariamente desativadas
+      // Para reativar: descomentar o bloco abaixo
+      // try {
+      //   const { data: notifs } = await supabase
+      //     .from("admin_notifications")
+      //     .select("id, title, message, scheduled_at, target")
+      //     .eq("sent", true)
+      //     .order("created_at", { ascending: false })
+      //     .limit(5);
+      //   if (!cancelled && notifs) {
+      //     const active = notifs.filter((n: any) => {
+      //       if (n.scheduled_at && new Date(n.scheduled_at) > now) return false;
+      //       return true;
+      //     });
+      //     setActiveNotifications(active);
+      //   }
+      // } catch {}
     })();
 
     return () => { cancelled = true; };

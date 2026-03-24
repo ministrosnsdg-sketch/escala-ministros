@@ -16,10 +16,17 @@
 
 import { supabase } from "./supabaseClient";
 
+// ============================================================
+// 🔕 NOTIFICAÇÕES TEMPORARIAMENTE DESATIVADAS
+// Para reativar: altere PUSH_DISABLED para false
+// ============================================================
+const PUSH_DISABLED = true;
+
 const PUSH_PERMISSION_ASKED = "push_permission_asked";
 
 /** Verifica se push notifications são suportadas neste navegador/dispositivo */
 export function isPushSupported(): boolean {
+  if (PUSH_DISABLED) return false; // 🔕 desativado temporariamente
   // Funciona em Chrome/Edge/Firefox no Android, Chrome/Edge no Desktop
   // iOS Safari 16.4+ com PWA instalada também suporta
   return (
@@ -46,6 +53,7 @@ export function wasPushAsked(): boolean {
 
 /** Solicita permissão de notificação e registra o token do dispositivo */
 export async function requestPushPermission(): Promise<boolean> {
+  if (PUSH_DISABLED) return false; // 🔕 desativado temporariamente
   if (!isPushSupported()) return false;
 
   try {
@@ -68,6 +76,7 @@ export async function requestPushPermission(): Promise<boolean> {
  * Isso garante que usuários com múltiplos dispositivos recebam em todos.
  */
 export async function registerPushToken(): Promise<boolean> {
+  if (PUSH_DISABLED) return false; // 🔕 desativado temporariamente
   try {
     const vapidKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
     if (!vapidKey) {
@@ -138,6 +147,7 @@ export async function sendPushViaEdgeFunction(
   target: "all" | "admins",
   notificationId: string
 ): Promise<{ sent: number; total: number; error?: string }> {
+  if (PUSH_DISABLED) return { sent: 0, total: 0, error: "Notificações temporariamente desativadas." }; // 🔕
   try {
     const { data, error } = await supabase.functions.invoke("send-push", {
       body: { title, message, target, notificationId },
@@ -153,6 +163,7 @@ export async function sendPushViaEdgeFunction(
 
 /** Envia notificação local (quando o app está aberto em foreground) */
 export function sendLocalNotification(title: string, body: string, tag?: string) {
+  if (PUSH_DISABLED) return; // 🔕 desativado temporariamente
   if (!isPushSupported()) return;
   if (Notification.permission !== "granted") return;
 
@@ -175,6 +186,7 @@ export function sendLocalNotification(title: string, body: string, tag?: string)
  * Deve ser chamado no login para manter o token atualizado.
  */
 export async function refreshPushTokenIfGranted(): Promise<void> {
+  if (PUSH_DISABLED) return; // 🔕 desativado temporariamente
   if (!isPushSupported()) return;
   if (Notification.permission !== "granted") return;
   await registerPushToken();

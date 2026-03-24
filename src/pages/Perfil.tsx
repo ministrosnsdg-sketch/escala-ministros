@@ -428,59 +428,14 @@ const PerfilInner: React.FC = () => {
                   <p className="text-xs text-gray-500 mt-0.5">Receba avisos de escalas, trocas e aniversários</p>
                 </div>
                 <div className="p-4 space-y-3">
-                  {pushPermission === "unsupported" ? (
-                    <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
-                      <p className="text-sm text-gray-600">⚠️ Seu navegador não suporta notificações push.</p>
-                      <p className="text-xs text-gray-400 mt-1">Use o Chrome no Android para receber notificações.</p>
+                  {/* 🔕 MANUTENÇÃO — restaurar bloco original quando reativar notificações */}
+                  <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 flex items-center gap-3">
+                    <span className="text-xl">🔕</span>
+                    <div>
+                      <p className="text-sm font-semibold text-gray-700">Notificações em manutenção</p>
+                      <p className="text-xs text-gray-500 mt-0.5">As notificações estão temporariamente pausadas. Em breve voltam a funcionar.</p>
                     </div>
-                  ) : pushPermission === "granted" ? (
-                    <div className="space-y-3">
-                      <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 flex items-center gap-3">
-                        <span className="text-xl">✅</span>
-                        <div>
-                          <p className="text-sm font-semibold text-green-800">Notificações ativas</p>
-                          <p className="text-xs text-green-600">Você receberá avisos neste dispositivo.</p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={handleRefreshPush}
-                        disabled={pushLoading}
-                        className="w-full py-2.5 rounded-xl border-2 border-gray-200 text-gray-600 text-sm font-semibold hover:bg-gray-50 disabled:opacity-50 transition-colors"
-                      >
-                        {pushLoading ? "Atualizando..." : "🔄 Atualizar registro deste dispositivo"}
-                      </button>
-                    </div>
-                  ) : pushPermission === "denied" ? (
-                    <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3">
-                      <p className="text-sm font-semibold text-red-800">🚫 Notificações bloqueadas</p>
-                      <p className="text-xs text-red-600 mt-1">
-                        Para ativar: no Chrome, toque nos 3 pontinhos → Configurações do site → Notificações → Permitir
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
-                        <p className="text-sm font-semibold text-amber-800">Notificações desativadas</p>
-                        <p className="text-xs text-amber-600 mt-0.5">Ative para receber avisos importantes da paróquia.</p>
-                      </div>
-                      <button
-                        onClick={handleActivatePush}
-                        disabled={pushLoading}
-                        className="w-full py-3 rounded-xl bg-[#4A6FA5] text-white text-sm font-bold hover:bg-[#3d5d8a] disabled:opacity-50 transition-colors"
-                      >
-                        {pushLoading ? "Aguarde..." : "🔔 Ativar notificações neste dispositivo"}
-                      </button>
-                    </div>
-                  )}
-                  {pushMessage && (
-                    <div className={`text-sm px-3 py-2 rounded-xl ${
-                      pushMessage.startsWith("✅")
-                        ? "bg-green-50 text-green-700 border border-green-200"
-                        : "bg-red-50 text-red-600 border border-red-200"
-                    }`}>
-                      {pushMessage}
-                    </div>
-                  )}
+                  </div>
                 </div>
               </div>
 
