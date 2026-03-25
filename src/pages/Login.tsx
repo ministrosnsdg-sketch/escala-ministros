@@ -184,7 +184,6 @@ export default function Login() {
     try {
       const { data, error } = await supabase.functions.invoke("reset-password", {
         body: { email: resetEmail.trim() },
-        headers: { Authorization: "" },
       });
       if (error || (data as any)?.error) {
         setError((data as any)?.error || "Não foi possível redefinir a senha.");
