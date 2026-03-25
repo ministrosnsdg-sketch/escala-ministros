@@ -14,6 +14,55 @@ import {
 
 type Mode = "login" | "changePassword" | "register" | "forgotPassword";
 
+// Ícone de olho aberto (senha visível)
+const EyeIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+  </svg>
+);
+
+// Ícone de olho fechado (senha oculta)
+const EyeOffIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+  </svg>
+);
+
+// Componente reutilizável de input de senha com olho
+function PasswordInput({
+  value,
+  onChange,
+  placeholder,
+  className,
+}: {
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  placeholder?: string;
+  className?: string;
+}) {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="relative">
+      <input
+        type={show ? "text" : "password"}
+        className={`w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 pr-10 text-sm focus:border-[#4A6FA5] focus:outline-none transition-colors ${className || ""}`}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+      />
+      <button
+        type="button"
+        onClick={() => setShow(!show)}
+        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#4A6FA5] transition-colors"
+        tabIndex={-1}
+      >
+        {show ? <EyeOffIcon /> : <EyeIcon />}
+      </button>
+    </div>
+  );
+}
+
 export default function Login() {
   const { signIn } = useAuth();
   const navigate = useNavigate();
@@ -76,14 +125,12 @@ export default function Login() {
       }
       setLoading(false);
 
-      // Se biometria está disponível e ainda NÃO está habilitada, perguntar ao usuário
       if (biometricSupported && !isBiometricEnabled() && !overrideEmail) {
         setPendingLoginCredentials({ email: normalizedEmail, password: loginPassword });
         setShowBiometricPrompt(true);
         return;
       }
 
-      // Se biometria já está habilitada, atualizar credenciais silenciosamente
       if (biometricSupported && isBiometricEnabled() && !overrideEmail) {
         saveBiometricCredentials(normalizedEmail, loginPassword);
       }
@@ -92,7 +139,6 @@ export default function Login() {
     } catch { setError("Erro inesperado ao tentar entrar."); setLoading(false); }
   };
 
-  // Resposta ao modal de biometria pós-login
   const handleBiometricPromptYes = () => {
     if (pendingLoginCredentials) {
       saveBiometricCredentials(pendingLoginCredentials.email, pendingLoginCredentials.password);
@@ -136,13 +182,15 @@ export default function Login() {
     if (!resetEmail.trim()) { setError("Informe o e-mail para redefinir a senha."); return; }
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke("reset-password", { body: { email: resetEmail.trim() } });
+      const { data, error } = await supabase.functions.invoke("reset-password", {
+        body: { email: resetEmail.trim() },
+        headers: { Authorization: "" },
+      });
       if (error || (data as any)?.error) {
         setError((data as any)?.error || "Não foi possível redefinir a senha.");
         setLoading(false);
         return;
       }
-      // Sucesso: volta para login com mensagem de instrução
       setResetEmail("");
       setLoading(false);
       setMode("login");
@@ -274,9 +322,7 @@ export default function Login() {
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-gray-600 mb-1.5">Senha</label>
-                    <input
-                      type="password"
-                      className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:border-[#4A6FA5] focus:outline-none transition-colors"
+                    <PasswordInput
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       placeholder="••••••••"
@@ -292,7 +338,6 @@ export default function Login() {
                       Esqueci a senha
                     </button>
                   </div>
-                  {/* Botão de login biométrico se já tem credenciais salvas */}
                   {biometricSaved && (
                     <button
                       type="button"
@@ -312,11 +357,19 @@ export default function Login() {
                 <>
                   <div>
                     <label className="block text-xs font-semibold text-gray-600 mb-1.5">Nova senha</label>
-                    <input type="password" className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:border-[#4A6FA5] focus:outline-none" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="Mínimo 6 caracteres" />
+                    <PasswordInput
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="Mínimo 6 caracteres"
+                    />
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-gray-600 mb-1.5">Confirmar senha</label>
-                    <input type="password" className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:border-[#4A6FA5] focus:outline-none" value={confirmNewPassword} onChange={(e) => setConfirmNewPassword(e.target.value)} placeholder="Repita a nova senha" />
+                    <PasswordInput
+                      value={confirmNewPassword}
+                      onChange={(e) => setConfirmNewPassword(e.target.value)}
+                      placeholder="Repita a nova senha"
+                    />
                   </div>
                 </>
               )}
@@ -360,11 +413,19 @@ export default function Login() {
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <label className="block text-xs font-semibold text-gray-600 mb-1.5">Senha *</label>
-                      <input type="password" className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:border-[#4A6FA5] focus:outline-none" value={regPassword} onChange={(e) => setRegPassword(e.target.value)} placeholder="Mín. 6 car." />
+                      <PasswordInput
+                        value={regPassword}
+                        onChange={(e) => setRegPassword(e.target.value)}
+                        placeholder="Mín. 6 car."
+                      />
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-gray-600 mb-1.5">Confirmar *</label>
-                      <input type="password" className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:border-[#4A6FA5] focus:outline-none" value={regPassword2} onChange={(e) => setRegPassword2(e.target.value)} placeholder="Repita" />
+                      <PasswordInput
+                        value={regPassword2}
+                        onChange={(e) => setRegPassword2(e.target.value)}
+                        placeholder="Repita"
+                      />
                     </div>
                   </div>
                 </>
