@@ -136,11 +136,21 @@ export default function Login() {
     if (!resetEmail.trim()) { setError("Informe o e-mail para redefinir a senha."); return; }
     setLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke("reset-password", { method: "POST", body: { email: resetEmail.trim() } });
-      if (error || (data as any)?.error) { setError((data as any)?.error || "Não foi possível redefinir a senha."); setLoading(false); return; }
-      setError("Senha redefinida! Use a senha: 123456 para entrar.");
-      setResetEmail(""); setLoading(false); setMode("login");
-    } catch { setError("Erro inesperado ao redefinir a senha."); setLoading(false); }
+      const { data, error } = await supabase.functions.invoke("reset-password", { body: { email: resetEmail.trim() } });
+      if (error || (data as any)?.error) {
+        setError((data as any)?.error || "Não foi possível redefinir a senha.");
+        setLoading(false);
+        return;
+      }
+      // Sucesso: volta para login com mensagem de instrução
+      setResetEmail("");
+      setLoading(false);
+      setMode("login");
+      setError("✅ Senha redefinida! Use a senha 123456 para entrar. Você precisará criar uma nova senha ao acessar.");
+    } catch {
+      setError("Erro inesperado ao redefinir a senha.");
+      setLoading(false);
+    }
   };
 
   const handleChangePassword = async () => {
