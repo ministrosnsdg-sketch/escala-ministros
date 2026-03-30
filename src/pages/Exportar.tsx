@@ -140,22 +140,27 @@ function NamesRow({
   nomes: string[];
   singleLine: boolean;
 }) {
-  const MAX = 11;
+  const SPLIT_THRESHOLD = 10; // a partir de 11 nomes, divide em duas linhas
   const ref = useRef<HTMLDivElement>(null);
   const compact = useMemo(() => compactNames(nomes), [nomes]);
 
-  // Calcular tamanho da fonte baseado na quantidade de nomes
+  // Se tiver mais de SPLIT_THRESHOLD nomes, divide em duas linhas iguais
+  const useTwoLines = compact.length > SPLIT_THRESHOLD;
+
+  // Calcular tamanho da fonte baseado na quantidade de nomes (apenas para linha única)
   const fontSize = useMemo(() => {
+    if (useTwoLines) return 8.5;
     if (!singleLine) return 10;
     const numNomes = compact.length;
     if (numNomes <= 4) return 10;
     if (numNomes <= 6) return 9;
     if (numNomes <= 8) return 8.5;
-    return 8; // Para 9+ nomes
-  }, [compact.length, singleLine]);
+    return 8;
+  }, [compact.length, singleLine, useTwoLines]);
 
   useEffect(() => {
-    if (!singleLine || !ref.current) return;
+    // Aplica ajuste automático de fonte apenas quando é linha única real
+    if (useTwoLines || !singleLine || !ref.current) return;
     const el = ref.current;
     const parent = el.parentElement;
     if (!parent) return;
@@ -166,22 +171,34 @@ function NamesRow({
       size -= 0.5;
       el.style.fontSize = `${size}px`;
     }
-  }, [compact, singleLine, fontSize]);
+  }, [compact, singleLine, fontSize, useTwoLines]);
 
   if (!compact.length) return <span className="text-gray-500">—</span>;
 
-  if (!singleLine && compact.length > MAX) {
-    const linhas: string[][] = [];
-    for (let i = 0; i < compact.length; i += MAX)
-      linhas.push(compact.slice(i, i + MAX));
-
+  // Mais de 10 nomes: divide em duas linhas dentro do mesmo quadro
+  if (useTwoLines) {
+    const meio = Math.ceil(compact.length / 2);
+    const linha1 = compact.slice(0, meio);
+    const linha2 = compact.slice(meio);
     return (
       <div className="flex flex-col gap-0.5">
-        {linhas.map((linha, i) => (
-          <div key={i} className="text-[10px] font-semibold">
-            {linha.join(" - ")}
-          </div>
-        ))}
+        <div style={{ fontSize: `${fontSize}px` }} className="font-semibold leading-tight">
+          {linha1.join(" - ")}
+        </div>
+        <div style={{ fontSize: `${fontSize}px` }} className="font-semibold leading-tight">
+          {linha2.join(" - ")}
+        </div>
+      </div>
+    );
+  }
+
+  // Modo multiline explícito (singleLine=false, sem atingir threshold)
+  if (!singleLine) {
+    return (
+      <div className="flex flex-col gap-0.5">
+        <div className="text-[10px] font-semibold">
+          {compact.join(" - ")}
+        </div>
       </div>
     );
   }
@@ -192,7 +209,7 @@ function NamesRow({
       style={{ fontSize: `${fontSize}px` }}
       className="font-semibold whitespace-nowrap overflow-hidden"
     >
-      {compact.slice(0, MAX).join(" - ")}
+      {compact.join(" - ")}
     </div>
   );
 }
