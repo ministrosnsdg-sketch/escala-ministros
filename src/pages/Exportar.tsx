@@ -248,7 +248,8 @@ function ExportarInner() {
     "08:30",
     "11:00",
   ]);
-  const [includeDomingosExtras, setIncludeDomingosExtras] = useState(true);
+  const [includeDomingos, setIncludeDomingos] = useState(true);
+  const [includeMissasSolenes, setIncludeMissasSolenes] = useState(true);
 
   const [isAdmin, setIsAdmin] = useState(false);
   const [loadingAdmin, setLoadingAdmin] = useState(true);
@@ -260,6 +261,8 @@ function ExportarInner() {
   @media print {
     @page { size: A4; margin: 12mm; }
     header, nav, .no-print { display: none !important; }
+    /* Oculta banners/avisos do app no PDF (ex: "Preencha sua disponibilidade") */
+    [data-app-banner], .app-banner, [role="alert"], [role="status"] { display: none !important; }
     body { background: #ffffff !important; }
     .only-print { display: block !important; }
     .page { page-break-after: always; }
@@ -617,14 +620,16 @@ function ExportarInner() {
     const next: Record<string, boolean> = {};
     times.forEach((t) => (next[t] = true));
     setIncludedTimes(next);
-    setIncludeDomingosExtras(true);
+    setIncludeDomingos(true);
+    setIncludeMissasSolenes(true);
   }
 
   function limparTodos() {
     const next: Record<string, boolean> = {};
     times.forEach((t) => (next[t] = false));
     setIncludedTimes(next);
-    setIncludeDomingosExtras(false);
+    setIncludeDomingos(false);
+    setIncludeMissasSolenes(false);
   }
 
   function handlePrint() {
@@ -647,19 +652,44 @@ function ExportarInner() {
     })),
 
     {
-      key: "domingos-extras",
-      label: `Página ÚNICA: Domingos ${domingoTimes.join(", ")} e Missas Extras`,
-      include: includeDomingosExtras,
+      key: "domingos",
+      label: `DOMINGOS — ${domingoTimes.join(", ")}`,
+      include: includeDomingos,
       singleLine: true,
       times: domingoTimes,
       isCombined: true,
       match: (ev: EscalaEvento) => {
-        if (ev.isExtra) return true;
+        if (ev.isExtra) return false;
         const dow = new Date(ev.date + "T00:00:00").getDay();
         return dow === 0 && domingoTimes.includes(ev.time);
       },
     },
+
+    {
+      key: "missas-solenes",
+      label: `MISSAS SOLENES / EXTRAS`,
+      include: includeMissasSolenes,
+      singleLine: true,
+      times: [],
+      isCombined: true,
+      match: (ev: EscalaEvento) => ev.isExtra,
+    },
   ];
+
+  /** Verifica se uma data/horário está bloqueado */
+  function isHorarioBloqueado(date: string, time: string): boolean {
+    const block = blockedMapState.get(date);
+    if (!block) return false;
+    // Dia inteiro bloqueado
+    if (block.blocked_times === null) return true;
+    // Horário específico bloqueado
+    if (Array.isArray(block.blocked_times)) {
+      return block.blocked_times.some(
+        (t) => t.slice(0, 5) === time.slice(0, 5)
+      );
+    }
+    return false;
+  }
 
   /** Gerar registros */
   function gerarRegistrosCompletos(pg: PaginaConfig): EventoCompleto[] {
@@ -671,6 +701,31 @@ function ExportarInner() {
     });
 
     if (pg.isCombined) {
+      // Página de MISSAS SOLENES / EXTRAS
+      if (pg.key === "missas-solenes") {
+        const extras: EventoCompleto[] = eventosNaPagina
+          .filter((ev) => ev.isExtra && ev.ministros.length)
+          .filter((ev) => !isHorarioBloqueado(ev.date, ev.time))
+          .sort((a, b) =>
+            a.date === b.date
+              ? a.time.localeCompare(b.time)
+              : a.date.localeCompare(b.date)
+          )
+          .map((ev) => ({
+            date: ev.date,
+            time: ev.time,
+            dow: new Date(ev.date + "T00:00:00").getDay(),
+            labelDia: DIAS_LONGO[new Date(ev.date + "T00:00:00").getDay()],
+            labelDiaHora: `${DIAS_LONGO[new Date(ev.date + "T00:00:00").getDay()]} - ${ev.time}`,
+            isExtra: true,
+            tituloExtra: ev.tituloExtra,
+            ministros: ev.ministros,
+          }));
+
+        return extras;
+      }
+
+      // Página de DOMINGOS
       const blocksPorHora: Record<string, EventoCompleto[]> = {};
       domingoTimes.forEach((t) => (blocksPorHora[t] = []));
 
@@ -681,6 +736,10 @@ function ExportarInner() {
           const key = `${date}|${t}|`;
           const ev = mapa.get(key);
           if (!ev || !ev.ministros.length) return;
+
+          // Se horário está bloqueado, não inclui ministros (evita vazamento de nomes por recorrência)
+          const bloqueado = isHorarioBloqueado(date, t);
+          if (bloqueado) return; // não inclui linha de domingo bloqueado
 
           blocksPorHora[t].push({
             date,
@@ -695,24 +754,6 @@ function ExportarInner() {
         });
       });
 
-      const extras: EventoCompleto[] = eventosNaPagina
-        .filter((ev) => ev.isExtra && ev.ministros.length)
-        .sort((a, b) =>
-          a.date === b.date
-            ? a.time.localeCompare(b.time)
-            : a.date.localeCompare(b.date)
-        )
-        .map((ev) => ({
-          date: ev.date,
-          time: ev.time,
-          dow: new Date(ev.date + "T00:00:00").getDay(),
-          labelDia: DIAS_LONGO[new Date(ev.date + "T00:00:00").getDay()],
-          labelDiaHora: `${DIAS_LONGO[new Date(ev.date + "T00:00:00").getDay()]} - ${ev.time}`,
-          isExtra: true,
-          tituloExtra: ev.tituloExtra,
-          ministros: ev.ministros,
-        }));
-
       const final: EventoCompleto[] = [];
 
       domingoTimes.forEach((t) => {
@@ -722,11 +763,6 @@ function ExportarInner() {
           final.push(...blk);
         }
       });
-
-      if (extras.length) {
-        extras[0].groupLabel = "MISSAS SOLENES";
-        final.push(...extras);
-      }
 
       return final;
     }
@@ -739,9 +775,32 @@ function ExportarInner() {
     dias.forEach((date) => {
       const key = `${date}|${t}|`;
       const ev = mapa.get(key);
+      const dow = new Date(date + "T00:00:00").getDay();
+      const bloqueado = isHorarioBloqueado(date, t);
+
+      // Se está bloqueado, gera linha com "Não haverá missa" (sem ministros)
+      // mesmo que não haja registro de escala — assim o admin vê o status do mês completo
+      if (bloqueado) {
+        // Só adiciona linha de bloqueado se houver horário cadastrado para aquele dia da semana
+        // (já garantido pelo filtro pg.match — verificamos se existe horário regular)
+        // Para evitar inundar com bloqueios sem missa programada, só mostramos se tinha algo programado
+        if (ev && ev.ministros.length) {
+          out.push({
+            date,
+            time: t,
+            dow,
+            labelDia: DIAS_LONGO[dow],
+            labelDiaHora: DIAS_LONGO[dow],
+            isExtra: false,
+            tituloExtra: null,
+            ministros: [], // vazio: não vaza nomes da recorrência
+          });
+        }
+        return;
+      }
+
       if (!ev || !ev.ministros.length) return;
 
-      const dow = new Date(date + "T00:00:00").getDay();
       out.push({
         date,
         time: t,
@@ -825,62 +884,196 @@ function ExportarInner() {
       </div>
 
       {/* Filtros */}
-      <div className="no-print bg-white rounded-2xl shadow-sm border border-gray-100 p-4 mb-4 space-y-3">
-        <div className="text-sm font-bold text-[#1E3A6E]">
-          Selecionar quais páginas de escala serão incluídas na impressão
+      <div className="no-print bg-white rounded-2xl shadow-sm border border-gray-100 mb-4 overflow-hidden">
+        {/* Cabeçalho do card no padrão do app */}
+        <div className="px-4 py-3 bg-gradient-to-r from-[#EEF4FF] to-[#F8FAFF] border-b border-[#D6E6F7] flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-base">📋</span>
+            <h3 className="text-sm font-bold text-[#1E3A6E]">
+              Páginas para impressão
+            </h3>
+          </div>
+          <span className="text-[11px] text-[#4A6FA5] font-semibold">
+            {[
+              ...Object.values(includedTimes).filter(Boolean),
+              includeDomingos,
+              includeMissasSolenes,
+            ].filter(Boolean).length}{" "}
+            de {times.length + 2} ativas
+          </span>
         </div>
 
-        <div className="space-y-1">
-          {times.map((t) => (
-            <label key={t} className="flex items-center gap-2 text-xs">
-              <input
-                type="checkbox"
-                checked={includedTimes[t] ?? false}
-                onChange={(e) =>
-                  setIncludedTimes((prev) => ({
-                    ...prev,
-                    [t]: e.target.checked,
-                  }))
+        {/* Lista de toggles */}
+        <div className="divide-y divide-gray-100">
+          {/* Missas regulares por horário */}
+          {times.map((t) => {
+            const checked = includedTimes[t] ?? false;
+            return (
+              <button
+                key={t}
+                type="button"
+                onClick={() =>
+                  setIncludedTimes((prev) => ({ ...prev, [t]: !prev[t] }))
                 }
-              />
-              <span>Página: Missas — {t}</span>
-            </label>
-          ))}
+                className={`w-full px-4 py-3 flex items-center justify-between gap-3 transition-colors text-left ${
+                  checked ? "bg-white hover:bg-[#F8FAFF]" : "bg-gray-50 hover:bg-gray-100"
+                }`}
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  <span
+                    className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold transition-colors ${
+                      checked
+                        ? "bg-[#EEF4FF] text-[#1E3A6E]"
+                        : "bg-gray-200 text-gray-500"
+                    }`}
+                  >
+                    🕐
+                  </span>
+                  <div className="min-w-0">
+                    <p
+                      className={`text-sm font-semibold truncate ${
+                        checked ? "text-gray-800" : "text-gray-500"
+                      }`}
+                    >
+                      Missas — {t}
+                    </p>
+                    <p className="text-[11px] text-gray-500 mt-0.5">
+                      Segunda a sábado neste horário
+                    </p>
+                  </div>
+                </div>
+                <span
+                  className={`relative inline-flex h-7 w-12 flex-shrink-0 items-center rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                    checked ? "bg-[#4A6FA5]" : "bg-gray-300"
+                  }`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                      checked ? "translate-x-5" : "translate-x-0"
+                    }`}
+                  />
+                </span>
+              </button>
+            );
+          })}
 
-          <label className="flex items-center gap-2 text-xs mt-2">
-            <input
-              type="checkbox"
-              checked={includeDomingosExtras}
-              onChange={(e) => setIncludeDomingosExtras(e.target.checked)}
-            />
-            <span>Página ÚNICA: Domingos {domingoTimes.join(", ")} e Missas Extras</span>
-          </label>
+          {/* Domingos */}
+          <button
+            type="button"
+            onClick={() => setIncludeDomingos(!includeDomingos)}
+            className={`w-full px-4 py-3 flex items-center justify-between gap-3 transition-colors text-left ${
+              includeDomingos ? "bg-white hover:bg-[#F8FAFF]" : "bg-gray-50 hover:bg-gray-100"
+            }`}
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <span
+                className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold transition-colors ${
+                  includeDomingos
+                    ? "bg-[#EEF4FF] text-[#1E3A6E]"
+                    : "bg-gray-200 text-gray-500"
+                }`}
+              >
+                ⛪
+              </span>
+              <div className="min-w-0">
+                <p
+                  className={`text-sm font-semibold truncate ${
+                    includeDomingos ? "text-gray-800" : "text-gray-500"
+                  }`}
+                >
+                  Domingos
+                </p>
+                <p className="text-[11px] text-gray-500 mt-0.5 truncate">
+                  Horários: {domingoTimes.join(" • ")}
+                </p>
+              </div>
+            </div>
+            <span
+              className={`relative inline-flex h-7 w-12 flex-shrink-0 items-center rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                includeDomingos ? "bg-[#4A6FA5]" : "bg-gray-300"
+              }`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                  includeDomingos ? "translate-x-5" : "translate-x-0"
+                }`}
+              />
+            </span>
+          </button>
+
+          {/* Missas Solenes / Extras */}
+          <button
+            type="button"
+            onClick={() => setIncludeMissasSolenes(!includeMissasSolenes)}
+            className={`w-full px-4 py-3 flex items-center justify-between gap-3 transition-colors text-left ${
+              includeMissasSolenes ? "bg-white hover:bg-[#F8FAFF]" : "bg-gray-50 hover:bg-gray-100"
+            }`}
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <span
+                className={`flex-shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold transition-colors ${
+                  includeMissasSolenes
+                    ? "bg-purple-100 text-purple-700"
+                    : "bg-gray-200 text-gray-500"
+                }`}
+              >
+                ✨
+              </span>
+              <div className="min-w-0">
+                <p
+                  className={`text-sm font-semibold truncate ${
+                    includeMissasSolenes ? "text-gray-800" : "text-gray-500"
+                  }`}
+                >
+                  Missas Solenes / Extras
+                </p>
+                <p className="text-[11px] text-gray-500 mt-0.5">
+                  Celebrações especiais e datas avulsas
+                </p>
+              </div>
+            </div>
+            <span
+              className={`relative inline-flex h-7 w-12 flex-shrink-0 items-center rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out ${
+                includeMissasSolenes ? "bg-purple-600" : "bg-gray-300"
+              }`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                  includeMissasSolenes ? "translate-x-5" : "translate-x-0"
+                }`}
+              />
+            </span>
+          </button>
         </div>
 
-        <div className="flex gap-2 pt-1">
-          <button
-            onClick={selecionarTodos}
-            className="px-3 py-1.5 rounded-2xl border text-[11px]"
-          >
-            Selecionar todos
-          </button>
-          <button
-            onClick={limparTodos}
-            className="px-3 py-1.5 rounded-2xl border text-[11px]"
-          >
-            Limpar
-          </button>
+        {/* Ações + status */}
+        <div className="px-4 py-3 bg-[#FAFBFD] border-t border-gray-100 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex gap-2">
+            <button
+              onClick={selecionarTodos}
+              className="px-3 py-1.5 rounded-lg bg-white border border-[#D6E6F7] text-[11px] font-semibold text-[#1E3A6E] hover:bg-[#EEF4FF] transition-colors"
+            >
+              ✓ Selecionar todos
+            </button>
+            <button
+              onClick={limparTodos}
+              className="px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-[11px] font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+            >
+              ✕ Limpar
+            </button>
+          </div>
+
+          {carregando && (
+            <span className="text-[11px] text-[#4A6FA5] font-medium flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-[#4A6FA5] animate-pulse" />
+              Carregando {labelMesAno}...
+            </span>
+          )}
         </div>
 
         {erro && (
-          <div className="text-[11px] text-red-600 bg-red-50 border border-red-200 px-3 py-2 rounded">
-            {erro}
-          </div>
-        )}
-
-        {carregando && (
-          <div className="text-[11px] text-gray-600">
-            Carregando escala para {labelMesAno}...
+          <div className="mx-4 mb-3 mt-1 text-[11px] text-red-700 bg-red-50 border border-red-200 px-3 py-2 rounded-lg">
+            ⚠️ {erro}
           </div>
         )}
       </div>
@@ -899,11 +1092,11 @@ function ExportarInner() {
                 Escala de Ministros
               </div>
 
-              <div className="px-4 text-center font-black text-[12px]">
+              <div className="px-4 text-center font-semibold text-[10px] text-gray-700">
                 ESCALA DE MINISTROS EXTRAORDINÁRIOS DA DISTRIBUIÇÃO DA EUCARISTIA
               </div>
 
-              <div className="px-4 pb-2 text-center font-semibold text-[10px]">
+              <div className="px-4 pb-3 pt-1 text-center font-black text-[26px] tracking-wide leading-tight">
                 {labelMesAno} — {pg.label}
               </div>
 

@@ -331,7 +331,7 @@ export function Layout({ children }: { children: ReactNode }) {
 
       {/* BANNERS / TOASTS */}
       {showPushBanner && (
-        <div className="max-w-7xl mx-auto px-3 pt-3">
+        <div className="max-w-7xl mx-auto px-3 pt-3 no-print">
           <div className="bg-[#EEF4FF] border border-[#D6E6F7] rounded-xl px-4 py-3 flex items-center gap-3">
             <span className="text-lg flex-shrink-0">🔔</span>
             <div className="flex-1 min-w-0">
@@ -353,7 +353,7 @@ export function Layout({ children }: { children: ReactNode }) {
       )}
 
       {showBirthBanner && location.pathname !== "/perfil" && (
-        <div className="max-w-7xl mx-auto px-3 pt-3">
+        <div className="max-w-7xl mx-auto px-3 pt-3 no-print">
           <div
             className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center gap-3 cursor-pointer hover:bg-amber-100 transition-colors"
             onClick={() => { navigate("/perfil"); setShowBirthBanner(false); }}
@@ -369,7 +369,7 @@ export function Layout({ children }: { children: ReactNode }) {
       )}
 
       {pendingSwaps > 0 && location.pathname !== "/troca" && (
-        <div className="max-w-7xl mx-auto px-3 pt-2">
+        <div className="max-w-7xl mx-auto px-3 pt-2 no-print">
           <div
             className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-center gap-3 cursor-pointer hover:bg-blue-100 transition-colors"
             onClick={() => navigate("/troca")}
@@ -387,7 +387,7 @@ export function Layout({ children }: { children: ReactNode }) {
       )}
 
       {showMondayReminder && location.pathname !== "/disponibilidade" && (
-        <div className="max-w-7xl mx-auto px-3 pt-2">
+        <div className="max-w-7xl mx-auto px-3 pt-2 no-print">
           <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 flex items-center gap-3">
             <span className="text-lg flex-shrink-0">📅</span>
             <div
