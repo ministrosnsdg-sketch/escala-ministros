@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 type Horario = {
   id: number;
@@ -221,6 +223,127 @@ export default function RelatorioDisponibilidade() {
     return true; // ALL
   }
 
+  function exportPDF() {
+    // Rótulo do filtro atual para o título do PDF
+    const filterLabel =
+      statusFilter === "LOW"
+        ? "Abaixo do mínimo"
+        : statusFilter === "FULL"
+        ? "Capacidade máxima"
+        : statusFilter === "OK"
+        ? "OK"
+        : "Todos";
+
+    const doc = new jsPDF("p", "mm", "a4");
+
+    // Cabeçalho
+    doc.setFontSize(14);
+    doc.setTextColor(30, 58, 110);
+    doc.text("Cobertura de horários", 14, 16);
+
+    doc.setFontSize(11);
+    doc.setTextColor(74, 111, 165);
+    doc.text(`${label}  —  Filtro: ${filterLabel}`, 14, 23);
+
+    let cursorY = 30;
+
+    // Aplica o filtro nas linhas (mesma regra da tela)
+    const fixedFiltered = fixedRows.filter(applyStatusFilter);
+    const extraFiltered = extraRows.filter(applyStatusFilter);
+
+    function statusOf(r: { current: number; min: number; max: number }) {
+      const falta = r.current < r.min;
+      const cheio = r.current >= r.max;
+      return falta ? "Abaixo do mínimo" : cheio ? "Capacidade máxima" : "OK";
+    }
+
+    // Tabela: Missas fixas
+    doc.setFontSize(12);
+    doc.setTextColor(30, 58, 110);
+    doc.text("Missas fixas", 14, cursorY);
+    cursorY += 4;
+
+    if (fixedFiltered.length === 0) {
+      doc.setFontSize(10);
+      doc.setTextColor(120, 120, 120);
+      doc.text("Nenhum registro para este filtro.", 14, cursorY + 4);
+      cursorY += 12;
+    } else {
+      autoTable(doc, {
+        head: [["Data", "Dia", "Hora", "Mín.", "Máx.", "Selecionados", "Status"]],
+        body: fixedFiltered.map((r) => [
+          r.date.split("-").reverse().join("/"),
+          r.weekday,
+          `${r.time}h`,
+          r.min,
+          r.max,
+          r.current,
+          statusOf(r),
+        ]),
+        startY: cursorY,
+        headStyles: { fillColor: [74, 111, 165] },
+        styles: { fontSize: 9 },
+        columnStyles: {
+          2: { halign: "center" },
+          3: { halign: "center" },
+          4: { halign: "center" },
+          5: { halign: "center" },
+          6: { halign: "center" },
+        },
+      });
+      cursorY = (doc as any).lastAutoTable.finalY + 8;
+    }
+
+    // Tabela: Missas extras
+    doc.setFontSize(12);
+    doc.setTextColor(124, 58, 237); // roxo, mesmo padrão usado em Missas Solenes
+    doc.text("Missas extras", 14, cursorY);
+    cursorY += 4;
+
+    if (extraFiltered.length === 0) {
+      doc.setFontSize(10);
+      doc.setTextColor(120, 120, 120);
+      doc.text("Nenhum registro para este filtro.", 14, cursorY + 4);
+    } else {
+      autoTable(doc, {
+        head: [
+          ["Data", "Dia", "Título", "Hora", "Mín.", "Máx.", "Selecionados", "Status"],
+        ],
+        body: extraFiltered.map((e) => [
+          e.date.split("-").reverse().join("/"),
+          e.weekday,
+          e.title,
+          `${e.time}h`,
+          e.min,
+          e.max,
+          e.current,
+          statusOf(e),
+        ]),
+        startY: cursorY,
+        headStyles: { fillColor: [124, 58, 237] },
+        styles: { fontSize: 9 },
+        columnStyles: {
+          3: { halign: "center" },
+          4: { halign: "center" },
+          5: { halign: "center" },
+          6: { halign: "center" },
+          7: { halign: "center" },
+        },
+      });
+    }
+
+    // Nome do arquivo
+    const slug =
+      statusFilter === "LOW"
+        ? "abaixo-minimo"
+        : statusFilter === "FULL"
+        ? "capacidade-maxima"
+        : statusFilter === "OK"
+        ? "ok"
+        : "todos";
+    doc.save(`cobertura-${slug}-${month + 1}-${year}.pdf`);
+  }
+
   return (
     <section className="space-y-3">
       <div className="flex flex-wrap gap-2 items-center text-xs">
@@ -261,6 +384,17 @@ export default function RelatorioDisponibilidade() {
           <option value="FULL">Capacidade máxima</option>
           <option value="OK">OK</option>
         </select>
+
+        {/* BOTÃO DE GERAR PDF — respeita o filtro acima */}
+        <button
+          onClick={exportPDF}
+          disabled={loading}
+          className="ml-auto bg-[#4A6FA5] hover:bg-[#3F5F8F] disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-xs font-semibold px-3 py-1.5 rounded-lg shadow-sm transition-colors flex items-center gap-1"
+          title="Gera o PDF apenas com os registros do filtro selecionado"
+        >
+          <span>📄</span>
+          <span>Gerar PDF</span>
+        </button>
       </div>
 
       <div className="bg-[#F0F4FA] border border-[#D6E6F7] rounded-2xl px-4 py-3 text-sm text-[#3F5F8F]">
