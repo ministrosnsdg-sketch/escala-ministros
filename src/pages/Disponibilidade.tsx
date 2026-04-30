@@ -3,6 +3,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import {
@@ -92,6 +93,26 @@ function formatDate(d: Date) {
   return d.toISOString().slice(0, 10);
 }
 
+// Converte "YYYY-MM-DD" -> "DD/MM/YYYY"
+function formatDateBR(isoDate: string) {
+  const [y, m, d] = isoDate.split("-");
+  if (!y || !m || !d) return isoDate;
+  return `${d}/${m}/${y}`;
+}
+
+// Chave única por ministro + ano + mês para persistir o rascunho local.
+// Evita misturar drafts entre ministros ou meses diferentes.
+function getDraftKey(ministerId: string, year: number, month: number) {
+  return `disp_draft_v1::${ministerId}::${year}-${String(month + 1).padStart(2, "0")}`;
+}
+
+// Tipo do payload salvo no localStorage
+type DraftPayload = {
+  monthly: string[];   // chaves "YYYY-MM-DD|horario_id"
+  extras: number[];    // ids de extras
+  savedAt: number;     // timestamp ms (informativo)
+};
+
 export default function DisponibilidadePage() {
   return (
     <RequireAuth>
@@ -149,6 +170,24 @@ function DisponibilidadeInner() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [pendingNav, setPendingNav] = useState<{ to: any; replace?: boolean } | null>(null);
   const [showNavConfirm, setShowNavConfirm] = useState(false);
+
+  // Modal de limite máximo atingido (vagas esgotadas)
+  // Lista de TODOS os horários sem vagas detectados ao tentar salvar
+  type LimitConflict = {
+    date: string;        // "YYYY-MM-DD"
+    time: string;        // "HH:MM"
+    title?: string;      // título da missa solene (se aplicável)
+    isExtra: boolean;
+  };
+  const [limitErrors, setLimitErrors] = useState<LimitConflict[] | null>(null);
+
+  // Controle de persistência do rascunho em localStorage.
+  // - draftReadyRef: garante que só persistimos depois que os dados do banco foram carregados,
+  //   pra não sobrescrever com Sets vazios durante a montagem inicial.
+  // - draftRestoredInfo: mensagem temporária quando um rascunho foi recuperado,
+  //   pra o usuário saber que as marcações pendentes voltaram.
+  const draftReadyRef = useRef(false);
+  const [draftRestoredInfo, setDraftRestoredInfo] = useState<string | null>(null);
 
   const [recWeekday, setRecWeekday] = useState<number | "">("");
   const [recHorarioId, setRecHorarioId] = useState<number | "">("");
@@ -440,6 +479,61 @@ function DisponibilidadeInner() {
   }, [user]);
 
   // ========= CARREGAR MÊS =========
+
+  // Sempre que muda ministro / ano / mês, suspendemos a persistência automática
+  // até que os dados do banco sejam recarregados e o draft restaurado.
+  // Sem isso, a troca de mês escreveria Sets vazios no localStorage entre o
+  // unmount lógico e o novo load.
+  useEffect(() => {
+    draftReadyRef.current = false;
+  }, [selectedMinisterId, year, month]);
+
+  // Persistência automática do rascunho.
+  // Roda toda vez que monthlyDraft / extrasDraft mudam, mas só DEPOIS que
+  // a carga inicial do mês acabou (draftReadyRef.current === true).
+  // Se o draft for igual ao banco, removemos a chave em vez de gravar lixo.
+  useEffect(() => {
+    if (!draftReadyRef.current) return;
+    if (!selectedMinisterId) return;
+    if (typeof window === "undefined") return;
+
+    try {
+      const key = getDraftKey(selectedMinisterId, year, month);
+
+      const sameMonthly =
+        monthlyDraft.size === originalMonthly.size &&
+        Array.from(monthlyDraft).every((k) => originalMonthly.has(k));
+      const sameExtras =
+        extrasDraft.size === originalExtras.size &&
+        Array.from(extrasDraft).every((id) => originalExtras.has(id));
+
+      if (sameMonthly && sameExtras) {
+        // Não há diferença vs banco -> não precisa guardar nada
+        window.localStorage.removeItem(key);
+        return;
+      }
+
+      const payload: DraftPayload = {
+        monthly: Array.from(monthlyDraft),
+        extras: Array.from(extrasDraft),
+        savedAt: Date.now(),
+      };
+      window.localStorage.setItem(key, JSON.stringify(payload));
+    } catch (e) {
+      // localStorage pode estar cheio ou indisponível (modo privado em alguns browsers).
+      // Não bloqueamos o usuário por isso.
+      console.warn("Não foi possível salvar o rascunho local:", e);
+    }
+  }, [
+    monthlyDraft,
+    extrasDraft,
+    originalMonthly,
+    originalExtras,
+    selectedMinisterId,
+    year,
+    month,
+  ]);
+
   useEffect(() => {
     const loadMonth = async () => {
       if (!selectedMinisterId || horarios.length === 0) return;
@@ -490,7 +584,8 @@ setBlockedDates(blockedDatesSet);
         origMonthly.add(`${r.date}|${r.horario_id}`);
       });
       setOriginalMonthly(origMonthly);
-      setMonthlyDraft(new Set(origMonthly));
+      // (monthlyDraft é definido mais abaixo, junto com extrasDraft, após a tentativa de
+      //  restauração do rascunho do localStorage)
 
       // extras do mês
       const { data: exData, error: exErr } = await supabase
@@ -534,7 +629,65 @@ setBlockedDates(blockedDatesSet);
       }
 
       setOriginalExtras(origExtras);
-      setExtrasDraft(new Set(origExtras));
+
+      // === RESTAURAÇÃO DE RASCUNHO (localStorage) ===
+      // Se houver um rascunho salvo localmente para esta combinação ministro+ano+mês,
+      // e ele for diferente do que veio do banco, restauramos como draft pendente.
+      // Isso evita perder marcações quando o navegador descarta a aba (mobile),
+      // quando o usuário troca de rota, atualiza a página, etc.
+      let restoredAny = false;
+      try {
+        if (typeof window !== "undefined" && selectedMinisterId) {
+          const key = getDraftKey(selectedMinisterId, year, month);
+          const raw = window.localStorage.getItem(key);
+          if (raw) {
+            const parsed = JSON.parse(raw) as DraftPayload;
+            const draftMonthly = new Set<string>(parsed.monthly || []);
+            const draftExtras = new Set<number>(parsed.extras || []);
+
+            // Diferente do banco?
+            const sameMonthly =
+              draftMonthly.size === origMonthly.size &&
+              Array.from(draftMonthly).every((k) => origMonthly.has(k));
+            const sameExtras =
+              draftExtras.size === origExtras.size &&
+              Array.from(draftExtras).every((id) => origExtras.has(id));
+
+            if (!sameMonthly || !sameExtras) {
+              setMonthlyDraft(draftMonthly);
+              setExtrasDraft(draftExtras);
+              restoredAny = true;
+            } else {
+              // Idêntico ao banco, mas confirma o estado dos drafts assim mesmo
+              setMonthlyDraft(new Set(origMonthly));
+              setExtrasDraft(new Set(origExtras));
+              // Limpa rascunho redundante
+              window.localStorage.removeItem(key);
+            }
+          } else {
+            setMonthlyDraft(new Set(origMonthly));
+            setExtrasDraft(new Set(origExtras));
+          }
+        } else {
+          setMonthlyDraft(new Set(origMonthly));
+          setExtrasDraft(new Set(origExtras));
+        }
+      } catch (e) {
+        console.error("Falha ao restaurar rascunho local:", e);
+        setMonthlyDraft(new Set(origMonthly));
+        setExtrasDraft(new Set(origExtras));
+      }
+
+      if (restoredAny) {
+        setDraftRestoredInfo(
+          "Recuperamos suas marcações pendentes que ainda não tinham sido confirmadas."
+        );
+      } else {
+        setDraftRestoredInfo(null);
+      }
+
+      // Libera a persistência automática a partir daqui
+      draftReadyRef.current = true;
 
       // contagens fixas
       const { data: countData } = await supabase.rpc(
@@ -757,6 +910,9 @@ setBlockedDates(blockedDatesSet);
       }
     });
 
+    // Coleta TODOS os conflitos antes de retornar, para mostrar de uma vez
+    const conflicts: LimitConflict[] = [];
+
     // checa inserções normais
     for (const { date, horario_id } of toInsertMonthly) {
       const h = horarioById.get(horario_id);
@@ -764,14 +920,13 @@ setBlockedDates(blockedDatesSet);
       const key = `${date}|${horario_id}`;
       const current = tempSlotCounts[key] || 0;
       if (current + 1 > h.max_allowed) {
-        setSavingAll(false);
-        setError(
-          `Limite máximo atingido para ${date} às ${h.time.slice(
-            0,
-            5
-          )}h. Ajuste suas escolhas.`
-        );
-        return false;
+        conflicts.push({
+          date,
+          time: h.time.slice(0, 5),
+          isExtra: false,
+        });
+        // não incrementa tempSlotCounts: vaga não foi consumida porque será desmarcada
+        continue;
       }
       tempSlotCounts[key] = current + 1;
     }
@@ -782,13 +937,26 @@ setBlockedDates(blockedDatesSet);
       if (!ex) continue;
       const current = tempExtraCounts[extra_id] || 0;
       if (current + 1 > ex.max_allowed) {
-        setSavingAll(false);
-        setError(
-          `Limite máximo atingido para a missa extra "${ex.title}" em ${ex.event_date}.`
-        );
-        return false;
+        conflicts.push({
+          date: ex.event_date,
+          time: ex.time.slice(0, 5),
+          title: ex.title,
+          isExtra: true,
+        });
+        continue;
       }
       tempExtraCounts[extra_id] = current + 1;
+    }
+
+    if (conflicts.length > 0) {
+      setSavingAll(false);
+      // Ordena por data, depois por hora, para apresentação consistente
+      conflicts.sort((a, b) => {
+        if (a.date !== b.date) return a.date.localeCompare(b.date);
+        return a.time.localeCompare(b.time);
+      });
+      setLimitErrors(conflicts);
+      return false;
     }
 
     try {
@@ -835,6 +1003,15 @@ setBlockedDates(blockedDatesSet);
       setSlotCounts(tempSlotCounts);
       setExtraCounts(tempExtraCounts);
       setInfo("Disponibilidade salva com sucesso.");
+      // Tudo confirmado no banco -> rascunho local não é mais necessário.
+      try {
+        if (typeof window !== "undefined" && selectedMinisterId) {
+          window.localStorage.removeItem(getDraftKey(selectedMinisterId, year, month));
+        }
+      } catch {
+        /* noop */
+      }
+      setDraftRestoredInfo(null);
       setSavingAll(false);
       return true;
     } catch (e: any) {
@@ -881,6 +1058,15 @@ setBlockedDates(blockedDatesSet);
     const { to, replace } = pendingNav;
     setMonthlyDraft(new Set(originalMonthly));
     setExtrasDraft(new Set(originalExtras));
+    // Usuário escolheu descartar -> apaga rascunho local também
+    try {
+      if (typeof window !== "undefined" && selectedMinisterId) {
+        window.localStorage.removeItem(getDraftKey(selectedMinisterId, year, month));
+      }
+    } catch {
+      /* noop */
+    }
+    setDraftRestoredInfo(null);
     setShowNavConfirm(false);
     setPendingNav(null);
     if (replace) navigate(to, { replace: true });
@@ -1060,6 +1246,22 @@ setBlockedDates(blockedDatesSet);
       {/* Erros / infos */}
       {error && <div className="text-sm text-red-600 bg-red-50 border-2 border-red-200 px-4 py-3 rounded-2xl flex items-center gap-2"><span>⚠️</span>{error}</div>}
       {info && <div className="text-sm text-green-700 bg-green-50 border-2 border-green-200 px-4 py-3 rounded-2xl flex items-center gap-2"><span>✅</span>{info}</div>}
+      {draftRestoredInfo && (
+        <div className="text-sm text-blue-700 bg-blue-50 border-2 border-blue-200 px-4 py-3 rounded-2xl flex items-start gap-2">
+          <span className="flex-shrink-0">💾</span>
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold">Marcações recuperadas</p>
+            <p className="text-xs text-blue-600 mt-0.5">{draftRestoredInfo} Confirme para salvar.</p>
+          </div>
+          <button
+            onClick={() => setDraftRestoredInfo(null)}
+            className="text-blue-400 hover:text-blue-600 text-lg leading-none flex-shrink-0"
+            aria-label="Fechar aviso"
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       {/* Recorrência */}
       {canEditSelectedMonth && (
@@ -1335,6 +1537,88 @@ setBlockedDates(blockedDatesSet);
               <button onClick={handleStayOnPage}
                 className="w-full py-3 rounded-2xl border-2 border-gray-200 text-gray-600 text-sm font-semibold hover:bg-gray-50">
                 Permanecer na página
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de limite máximo atingido */}
+      {limitErrors && limitErrors.length > 0 && (
+        <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+          <div className="bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[85vh]">
+            {/* Handle mobile */}
+            <div className="flex justify-center pt-3 pb-1 sm:hidden flex-shrink-0">
+              <div className="w-10 h-1 bg-gray-200 rounded-full" />
+            </div>
+
+            {/* Topo (fixo) */}
+            <div className="px-5 pt-4 pb-3 flex-shrink-0">
+              {/* Ícone de alerta */}
+              <div className="flex justify-center mb-3">
+                <div className="w-14 h-14 rounded-full bg-red-50 border-2 border-red-100 flex items-center justify-center">
+                  <span className="text-2xl">⚠️</span>
+                </div>
+              </div>
+
+              <h3 className="text-base font-bold text-[#1E3A6E] text-center mb-2">
+                {limitErrors.length === 1
+                  ? "Horário sem vagas"
+                  : `${limitErrors.length} horários sem vagas`}
+              </h3>
+
+              <p className="text-sm text-gray-600 text-center">
+                {limitErrors.length === 1
+                  ? "Este horário já atingiu o número máximo de ministros e não pode ser selecionado."
+                  : "Os horários abaixo já atingiram o número máximo de ministros e não podem ser selecionados."}
+              </p>
+            </div>
+
+            {/* Lista de conflitos (com scroll se for longa) */}
+            <div className="px-5 overflow-y-auto flex-1 min-h-0">
+              <div className="space-y-2 pb-1">
+                {limitErrors.map((c, idx) => (
+                  <div
+                    key={`${c.date}-${c.time}-${c.isExtra ? "e" : "f"}-${idx}`}
+                    className="bg-red-50 border-2 border-red-100 rounded-2xl p-3"
+                  >
+                    {c.isExtra && c.title && (
+                      <p className="text-xs font-semibold text-red-700 mb-1 truncate">
+                        {c.title}
+                      </p>
+                    )}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-base flex-shrink-0">📅</span>
+                        <span className="text-sm font-bold text-gray-800 truncate">
+                          {formatDateBR(c.date)}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="text-base">🕒</span>
+                        <span className="text-sm font-bold text-gray-800">
+                          {c.time}h
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Rodapé (fixo) */}
+            <div className="px-5 pt-3 pb-5 flex-shrink-0">
+              <p className="text-xs text-gray-500 text-center mb-3">
+                {limitErrors.length === 1
+                  ? "Por favor, desmarque este horário e escolha outro disponível."
+                  : "Por favor, desmarque esses horários e escolha outros disponíveis."}
+              </p>
+
+              <button
+                onClick={() => setLimitErrors(null)}
+                className="w-full py-3 rounded-2xl bg-gradient-to-r from-[#2756A3] to-[#4A6FA5] text-white text-sm font-bold shadow-md shadow-blue-100 active:scale-95 transition-transform"
+              >
+                Entendi
               </button>
             </div>
           </div>
