@@ -326,6 +326,25 @@ function DisponibilidadeInner() {
     JSON.stringify(Array.from(extrasDraft).sort()) !==
       JSON.stringify(Array.from(originalExtras).sort());
 
+  // Datas em que TODA a programação foi bloqueada (blocked_times === null).
+  // Só essas devem deixar o dia opaco no calendário.
+  const wholeDayBlockedDates = useMemo(() => {
+    const set = new Set<string>();
+    blockedMasses.forEach((b) => {
+      if (!b.blocked_times) set.add(b.date);
+    });
+    return set;
+  }, [blockedMasses]);
+
+  // True se aquele horário/dia está bloqueado pela coordenação
+  // (dia inteiro bloqueado OU este horário específico bloqueado).
+  const isSlotBlocked = (date: string, time: string): boolean => {
+    const blocked = blockedMasses.find((b) => b.date === date);
+    if (!blocked) return false;
+    if (!blocked.blocked_times) return true;
+    return blocked.blocked_times.includes(time);
+  };
+
   // Warn ao fechar aba
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
@@ -618,10 +637,10 @@ setBlockedDates(blockedDatesSet);
 
     const horario = horarios.find((h) => h.id === horarioId);
 
-    // Verificação de bloqueio
-    const blocked = blockedMasses.find((b) => b.date === date);
-    if (blocked && blocked.blocked_times && horario && blocked.blocked_times.includes(horario.time)) {
-      setError(`Este horário está bloqueado. Motivo: ${blocked.reason || "Sem motivo especificado"}`);
+    // Verificação de bloqueio (dia inteiro OU este horário específico)
+    if (horario && isSlotBlocked(date, horario.time)) {
+      const blocked = blockedMasses.find((b) => b.date === date);
+      setError(`Este horário está bloqueado. Motivo: ${blocked?.reason || "Sem motivo especificado"}`);
       return;
     }
 
@@ -654,13 +673,11 @@ setBlockedDates(blockedDatesSet);
 
     const extra = extras.find((e) => e.id === extraId);
 
-    // Verificação de bloqueio
-    if (extra) {
+    // Verificação de bloqueio (dia inteiro OU este horário específico)
+    if (extra && isSlotBlocked(extra.event_date, extra.time)) {
       const blocked = blockedMasses.find((b) => b.date === extra.event_date);
-      if (blocked && blocked.blocked_times && blocked.blocked_times.includes(extra.time)) {
-        setError(`Este horário está bloqueado. Motivo: ${blocked.reason || "Sem motivo especificado"}`);
-        return;
-      }
+      setError(`Este horário está bloqueado. Motivo: ${blocked?.reason || "Sem motivo especificado"}`);
+      return;
     }
 
     const adding = !extrasDraft.has(extraId);
@@ -745,9 +762,8 @@ setBlockedDates(blockedDatesSet);
       const date = formatDate(dt);
       const key = `${date}|${horarioId}`;
 
-      // Pula datas com este horário bloqueado pela coordenação
-      const blocked = blockedMasses.find((b) => b.date === date);
-      if (blocked && blocked.blocked_times && blocked.blocked_times.includes(horario.time)) {
+      // Pula datas com este horário bloqueado pela coordenação (dia inteiro ou hora específica)
+      if (isSlotBlocked(date, horario.time)) {
         continue;
       }
 
@@ -1194,8 +1210,9 @@ setBlockedDates(blockedDatesSet);
                 const isDisabled = !hasHorario && !hasExtras;
                 const isSelected = selectedDate === date;
                 const isBlocked = blockedDates.has(date);
-                // Só ofusca se bloqueado E não tiver missas solenes (extras) no dia
-                const shouldDim = isBlocked && !hasExtras;
+                // Só ofusca se o DIA INTEIRO estiver bloqueado e não tiver missas solenes (extras).
+                // Bloqueio de horário específico mantém o dia normal, só com a bolinha vermelha.
+                const shouldDim = wholeDayBlockedDates.has(date) && !hasExtras;
 
                 return (
                   <button key={date}
@@ -1271,7 +1288,7 @@ setBlockedDates(blockedDatesSet);
                       const checked = monthlyDraft.has(key);
                       const count = slotCounts[key] || 0;
                       const blocked = blockedMasses.find(b => b.date === selectedDate);
-                      const isBlocked = blocked && blocked.blocked_times && blocked.blocked_times.includes(h.time);
+                      const isBlocked = blocked && (!blocked.blocked_times || blocked.blocked_times.includes(h.time));
                       return (
                         <label key={h.id} className={`flex items-center gap-3 p-3 rounded-2xl border-2 cursor-pointer transition-all ${
                           isBlocked ? "bg-red-50 border-red-200 opacity-60 cursor-not-allowed"
@@ -1306,7 +1323,7 @@ setBlockedDates(blockedDatesSet);
                       const checked = extrasDraft.has(e.id);
                       const count = extraCounts[e.id] || 0;
                       const blocked = blockedMasses.find(b => b.date === selectedDate);
-                      const isBlocked = blocked && blocked.blocked_times && blocked.blocked_times.includes(e.time);
+                      const isBlocked = blocked && (!blocked.blocked_times || blocked.blocked_times.includes(e.time));
                       return (
                         <label key={e.id} className={`flex items-center gap-3 p-3 rounded-2xl border-2 cursor-pointer transition-all ${
                           isBlocked ? "bg-red-50 border-red-200 opacity-60 cursor-not-allowed"

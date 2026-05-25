@@ -98,6 +98,9 @@ function EscalaInner() {
   // NOVOS ESTADOS PARA BLOQUEIOS
   const [blockedDates, setBlockedDates] = useState<Set<string>>(new Set());
   const [blockedMasses, setBlockedMasses] = useState<BlockedMasses[]>([]);
+  // Datas com TODA a programação bloqueada (blocked_times === null).
+  // Só essas devem deixar o dia opaco no calendário.
+  const [wholeDayBlockedDates, setWholeDayBlockedDates] = useState<Set<string>>(new Set());
 
   // Buscar ministro do usuário logado
   useEffect(() => {
@@ -191,22 +194,27 @@ function EscalaInner() {
         .lte("date", end);
 
       const blocks = (blocksData || []).map((b: any) => ({
-  ...b,
-  blocked_times: Array.isArray(b.blocked_times)
-    ? b.blocked_times
-    : [],
-}));
+        ...b,
+        // Mantém null como null (significa "dia inteiro bloqueado"); arrays são preservados.
+        blocked_times: Array.isArray(b.blocked_times) ? b.blocked_times : null,
+      }));
 
-setBlockedMasses(blocks);
+      setBlockedMasses(blocks);
 
       const blockedDatesSet = new Set<string>();
-      blocks.forEach(b => {
-        // A data está bloqueada se: blocked_times for NULL (dia todo bloqueado) OU blocked_times for um array não vazio
-        if (!b.blocked_times || b.blocked_times.length > 0) {
+      const wholeDayBlockedSet = new Set<string>();
+      blocks.forEach((b: any) => {
+        // Dia inteiro bloqueado -> blocked_times === null
+        if (!b.blocked_times) {
+          blockedDatesSet.add(b.date);
+          wholeDayBlockedSet.add(b.date);
+        } else if (b.blocked_times.length > 0) {
+          // Horários específicos bloqueados -> bolinha vermelha, mas dia não fica opaco
           blockedDatesSet.add(b.date);
         }
       });
       setBlockedDates(blockedDatesSet);
+      setWholeDayBlockedDates(wholeDayBlockedSet);
 
       // MISSAS FINAIS (regular + extras)
       let regRows: any[] = [];
@@ -578,8 +586,9 @@ setBlockedMasses(blocks);
               const hasExtras = extrasDates.has(c.date);
               const isToday = c.date === todayIso;
               const isBlocked = blockedDates.has(c.date);
-              // Só ofusca se bloqueado E não tiver missas solenes (extras) no dia
-              const shouldDim = isBlocked && !hasExtras;
+              // Só ofusca se o DIA INTEIRO estiver bloqueado e não tiver missas solenes (extras).
+              // Bloqueio de horário específico mantém o dia normal, só com a bolinha vermelha.
+              const shouldDim = wholeDayBlockedDates.has(c.date) && !hasExtras;
 
               return (
                 <button

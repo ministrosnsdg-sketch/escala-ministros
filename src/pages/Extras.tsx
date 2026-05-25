@@ -136,14 +136,31 @@ function ExtrasInner() {
     setSaving(true);
     setError(null);
 
-    await supabase.from("extras").insert({
-      title: newTitle.trim(),
-      event_date: newDate,
-      time: newTime,
-      min_required: newMin,
-      max_allowed: newMax,
-      active: true,
-    });
+    // Cria a Solene e captura o ID gerado pelo banco
+    const { data: insertedExtras, error: insertErr } = await supabase
+      .from("extras")
+      .insert({
+        title: newTitle.trim(),
+        event_date: newDate,
+        time: newTime,
+        min_required: newMin,
+        max_allowed: newMax,
+        active: true,
+      })
+      .select();
+
+    const newExtra = insertedExtras?.[0];
+
+    if (insertErr || !newExtra) {
+      setSaving(false);
+      setError("Erro ao criar a missa solene.");
+      return;
+    }
+
+    // Migração automática: se houver Missa Fixa no mesmo dia/horário com
+    // ministros já marcados (disponibilidade ou escala), as marcações migram
+    // para a Solene e as linhas antigas são removidas das tabelas "regular".
+    await migrateRegularToExtra(newExtra.id, newDate, newTime);
 
     setSaving(false);
     setShowNewModal(false);
@@ -155,6 +172,81 @@ function ExtrasInner() {
 
     await refresh();
   };
+
+  // Migra disponibilidades e escalas da Missa Fixa correspondente para a Solene.
+  // Procura um horário fixo (mesmo weekday, mesma hora) com linhas em
+  // monthly_availability_regular / escala_regular para a data; migra essas linhas
+  // para availability_extras / escala_extras e apaga as originais.
+  async function migrateRegularToExtra(
+    extraId: number,
+    eventDate: string,
+    eventTime: string
+  ) {
+    const weekday = new Date(eventDate + "T00:00:00").getDay();
+    const normalizedTime = eventTime.slice(0, 5);
+
+    const { data: horariosData } = await supabase
+      .from("horarios")
+      .select("id, time")
+      .eq("weekday", weekday)
+      .eq("active", true);
+
+    const matching = (horariosData || []).find(
+      (h: any) => String(h.time).slice(0, 5) === normalizedTime
+    );
+    if (!matching) return;
+
+    // 1. Disponibilidade: monthly_availability_regular -> availability_extras
+    const { data: existingAvail } = await supabase
+      .from("monthly_availability_regular")
+      .select("minister_id")
+      .eq("date", eventDate)
+      .eq("horario_id", matching.id);
+
+    if (existingAvail && existingAvail.length > 0) {
+      const rows = existingAvail.map((r: any) => ({
+        minister_id: r.minister_id,
+        extra_id: extraId,
+      }));
+      const { error: insErr } = await supabase
+        .from("availability_extras")
+        .insert(rows);
+
+      // Só apaga as linhas antigas se a migração da disponibilidade deu certo
+      if (!insErr) {
+        await supabase
+          .from("monthly_availability_regular")
+          .delete()
+          .eq("date", eventDate)
+          .eq("horario_id", matching.id);
+      }
+    }
+
+    // 2. Escala (se já estava formada): escala_regular -> escala_extras
+    const { data: existingEscala } = await supabase
+      .from("escala_regular")
+      .select("minister_id")
+      .eq("date", eventDate)
+      .eq("horario_id", matching.id);
+
+    if (existingEscala && existingEscala.length > 0) {
+      const rows = existingEscala.map((r: any) => ({
+        minister_id: r.minister_id,
+        extra_id: extraId,
+      }));
+      const { error: insErr } = await supabase
+        .from("escala_extras")
+        .insert(rows);
+
+      if (!insErr) {
+        await supabase
+          .from("escala_regular")
+          .delete()
+          .eq("date", eventDate)
+          .eq("horario_id", matching.id);
+      }
+    }
+  }
 
   // -------------------------------------------------------
   // CAMPOS DE EDIÇÃO
