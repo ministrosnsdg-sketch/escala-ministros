@@ -3,7 +3,6 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useState,
 } from "react";
 import {
@@ -100,19 +99,6 @@ function formatDateBR(isoDate: string) {
   return `${d}/${m}/${y}`;
 }
 
-// Chave única por ministro + ano + mês para persistir o rascunho local.
-// Evita misturar drafts entre ministros ou meses diferentes.
-function getDraftKey(ministerId: string, year: number, month: number) {
-  return `disp_draft_v1::${ministerId}::${year}-${String(month + 1).padStart(2, "0")}`;
-}
-
-// Tipo do payload salvo no localStorage
-type DraftPayload = {
-  monthly: string[];   // chaves "YYYY-MM-DD|horario_id"
-  extras: number[];    // ids de extras
-  savedAt: number;     // timestamp ms (informativo)
-};
-
 export default function DisponibilidadePage() {
   return (
     <RequireAuth>
@@ -181,13 +167,13 @@ function DisponibilidadeInner() {
   };
   const [limitErrors, setLimitErrors] = useState<LimitConflict[] | null>(null);
 
-  // Controle de persistência do rascunho em localStorage.
-  // - draftReadyRef: garante que só persistimos depois que os dados do banco foram carregados,
-  //   pra não sobrescrever com Sets vazios durante a montagem inicial.
-  // - draftRestoredInfo: mensagem temporária quando um rascunho foi recuperado,
-  //   pra o usuário saber que as marcações pendentes voltaram.
-  const draftReadyRef = useRef(false);
-  const [draftRestoredInfo, setDraftRestoredInfo] = useState<string | null>(null);
+  // Modal de conflito ao aplicar recorrência: alguns dias estão lotados.
+  // availableKeys: chaves "YYYY-MM-DD|horario_id" que podem ser marcadas;
+  // fullSlots: horários lotados que precisam ser apresentados ao usuário.
+  const [recurrenceConflict, setRecurrenceConflict] = useState<{
+    availableKeys: string[];
+    fullSlots: LimitConflict[];
+  } | null>(null);
 
   const [recWeekday, setRecWeekday] = useState<number | "">("");
   const [recHorarioId, setRecHorarioId] = useState<number | "">("");
@@ -472,6 +458,15 @@ function DisponibilidadeInner() {
         setSettingsHardClose(!!sData.hard_close);
       }
 
+      // Liberações manuais ativas (open_until >= agora) configuradas pela coordenação
+      const { data: ovData } = await supabase
+        .from("availability_overrides")
+        .select("*")
+        .gte("open_until", new Date().toISOString())
+        .order("open_from", { ascending: true });
+
+      setOverrides((ovData || []) as AvailabilityOverride[]);
+
       setLoadingBase(false);
     };
 
@@ -479,60 +474,6 @@ function DisponibilidadeInner() {
   }, [user]);
 
   // ========= CARREGAR MÊS =========
-
-  // Sempre que muda ministro / ano / mês, suspendemos a persistência automática
-  // até que os dados do banco sejam recarregados e o draft restaurado.
-  // Sem isso, a troca de mês escreveria Sets vazios no localStorage entre o
-  // unmount lógico e o novo load.
-  useEffect(() => {
-    draftReadyRef.current = false;
-  }, [selectedMinisterId, year, month]);
-
-  // Persistência automática do rascunho.
-  // Roda toda vez que monthlyDraft / extrasDraft mudam, mas só DEPOIS que
-  // a carga inicial do mês acabou (draftReadyRef.current === true).
-  // Se o draft for igual ao banco, removemos a chave em vez de gravar lixo.
-  useEffect(() => {
-    if (!draftReadyRef.current) return;
-    if (!selectedMinisterId) return;
-    if (typeof window === "undefined") return;
-
-    try {
-      const key = getDraftKey(selectedMinisterId, year, month);
-
-      const sameMonthly =
-        monthlyDraft.size === originalMonthly.size &&
-        Array.from(monthlyDraft).every((k) => originalMonthly.has(k));
-      const sameExtras =
-        extrasDraft.size === originalExtras.size &&
-        Array.from(extrasDraft).every((id) => originalExtras.has(id));
-
-      if (sameMonthly && sameExtras) {
-        // Não há diferença vs banco -> não precisa guardar nada
-        window.localStorage.removeItem(key);
-        return;
-      }
-
-      const payload: DraftPayload = {
-        monthly: Array.from(monthlyDraft),
-        extras: Array.from(extrasDraft),
-        savedAt: Date.now(),
-      };
-      window.localStorage.setItem(key, JSON.stringify(payload));
-    } catch (e) {
-      // localStorage pode estar cheio ou indisponível (modo privado em alguns browsers).
-      // Não bloqueamos o usuário por isso.
-      console.warn("Não foi possível salvar o rascunho local:", e);
-    }
-  }, [
-    monthlyDraft,
-    extrasDraft,
-    originalMonthly,
-    originalExtras,
-    selectedMinisterId,
-    year,
-    month,
-  ]);
 
   useEffect(() => {
     const loadMonth = async () => {
@@ -584,8 +525,6 @@ setBlockedDates(blockedDatesSet);
         origMonthly.add(`${r.date}|${r.horario_id}`);
       });
       setOriginalMonthly(origMonthly);
-      // (monthlyDraft é definido mais abaixo, junto com extrasDraft, após a tentativa de
-      //  restauração do rascunho do localStorage)
 
       // extras do mês
       const { data: exData, error: exErr } = await supabase
@@ -630,64 +569,8 @@ setBlockedDates(blockedDatesSet);
 
       setOriginalExtras(origExtras);
 
-      // === RESTAURAÇÃO DE RASCUNHO (localStorage) ===
-      // Se houver um rascunho salvo localmente para esta combinação ministro+ano+mês,
-      // e ele for diferente do que veio do banco, restauramos como draft pendente.
-      // Isso evita perder marcações quando o navegador descarta a aba (mobile),
-      // quando o usuário troca de rota, atualiza a página, etc.
-      let restoredAny = false;
-      try {
-        if (typeof window !== "undefined" && selectedMinisterId) {
-          const key = getDraftKey(selectedMinisterId, year, month);
-          const raw = window.localStorage.getItem(key);
-          if (raw) {
-            const parsed = JSON.parse(raw) as DraftPayload;
-            const draftMonthly = new Set<string>(parsed.monthly || []);
-            const draftExtras = new Set<number>(parsed.extras || []);
-
-            // Diferente do banco?
-            const sameMonthly =
-              draftMonthly.size === origMonthly.size &&
-              Array.from(draftMonthly).every((k) => origMonthly.has(k));
-            const sameExtras =
-              draftExtras.size === origExtras.size &&
-              Array.from(draftExtras).every((id) => origExtras.has(id));
-
-            if (!sameMonthly || !sameExtras) {
-              setMonthlyDraft(draftMonthly);
-              setExtrasDraft(draftExtras);
-              restoredAny = true;
-            } else {
-              // Idêntico ao banco, mas confirma o estado dos drafts assim mesmo
-              setMonthlyDraft(new Set(origMonthly));
-              setExtrasDraft(new Set(origExtras));
-              // Limpa rascunho redundante
-              window.localStorage.removeItem(key);
-            }
-          } else {
-            setMonthlyDraft(new Set(origMonthly));
-            setExtrasDraft(new Set(origExtras));
-          }
-        } else {
-          setMonthlyDraft(new Set(origMonthly));
-          setExtrasDraft(new Set(origExtras));
-        }
-      } catch (e) {
-        console.error("Falha ao restaurar rascunho local:", e);
-        setMonthlyDraft(new Set(origMonthly));
-        setExtrasDraft(new Set(origExtras));
-      }
-
-      if (restoredAny) {
-        setDraftRestoredInfo(
-          "Recuperamos suas marcações pendentes que ainda não tinham sido confirmadas."
-        );
-      } else {
-        setDraftRestoredInfo(null);
-      }
-
-      // Libera a persistência automática a partir daqui
-      draftReadyRef.current = true;
+      setMonthlyDraft(new Set(origMonthly));
+      setExtrasDraft(new Set(origExtras));
 
       // contagens fixas
       const { data: countData } = await supabase.rpc(
@@ -712,21 +595,6 @@ setBlockedDates(blockedDatesSet);
       });
       setExtraCounts(exMap);
 
-      // define dia inicial
-      const daysInMonth = lastDayOfMonth.getDate();
-      let initial: string | null = null;
-      for (let d = 1; d <= daysInMonth; d++) {
-        const dt = new Date(year, month, d);
-        const wd = dt.getDay();
-        const dtStr = formatDate(dt);
-        if (
-          (horariosPorWeekday[wd] && horariosPorWeekday[wd].length > 0) ||
-          extrasByDate[dtStr]
-        ) {
-          initial = dtStr;
-          break;
-        }
-      }
       setSelectedDate(null);
 
       setLoadingMonth(false);
@@ -747,16 +615,34 @@ setBlockedDates(blockedDatesSet);
 
   const toggleDraftMonthly = (date: string, horarioId: number) => {
     if (!canEditSelectedMonth || savingAll) return;
-    // NOVA VERIFICAÇÃO DE BLOQUEIO
-  const blocked = blockedMasses.find(b => b.date === date);
-  if (blocked && blocked.blocked_times) {
-    const horario = horarios.find(h => h.id === horarioId);
-    if (horario && blocked.blocked_times.includes(horario.time)) {
-      setError(`Este horário está bloqueado. Motivo: ${blocked.reason || 'Sem motivo especificado'}`);
+
+    const horario = horarios.find((h) => h.id === horarioId);
+
+    // Verificação de bloqueio
+    const blocked = blockedMasses.find((b) => b.date === date);
+    if (blocked && blocked.blocked_times && horario && blocked.blocked_times.includes(horario.time)) {
+      setError(`Este horário está bloqueado. Motivo: ${blocked.reason || "Sem motivo especificado"}`);
       return;
     }
-  }
+
     const key = `${date}|${horarioId}`;
+    const adding = !monthlyDraft.has(key);
+
+    // Verificação de limite máximo (somente ao MARCAR um slot novo - que não estava no banco)
+    if (adding && horario && !originalMonthly.has(key)) {
+      const current = slotCounts[key] || 0;
+      if (current >= horario.max_allowed) {
+        setLimitErrors([
+          {
+            date,
+            time: horario.time.slice(0, 5),
+            isExtra: false,
+          },
+        ]);
+        return;
+      }
+    }
+
     const next = new Set(monthlyDraft);
     if (next.has(key)) next.delete(key);
     else next.add(key);
@@ -766,15 +652,35 @@ setBlockedDates(blockedDatesSet);
   const toggleDraftExtra = (extraId: number) => {
     if (!canEditSelectedMonth || savingAll) return;
 
-    // NOVA VERIFICAÇÃO DE BLOQUEIO
-  const extra = extras.find(e => e.id === extraId);
-  if (extra) {
-    const blocked = blockedMasses.find(b => b.date === extra.event_date);
-    if (blocked && blocked.blocked_times && blocked.blocked_times.includes(extra.time)) {
-      setError(`Este horário está bloqueado. Motivo: ${blocked.reason || 'Sem motivo especificado'}`);
-      return;
+    const extra = extras.find((e) => e.id === extraId);
+
+    // Verificação de bloqueio
+    if (extra) {
+      const blocked = blockedMasses.find((b) => b.date === extra.event_date);
+      if (blocked && blocked.blocked_times && blocked.blocked_times.includes(extra.time)) {
+        setError(`Este horário está bloqueado. Motivo: ${blocked.reason || "Sem motivo especificado"}`);
+        return;
+      }
     }
-  }
+
+    const adding = !extrasDraft.has(extraId);
+
+    // Verificação de limite máximo (somente ao MARCAR uma extra nova - que não estava no banco)
+    if (adding && extra && !originalExtras.has(extraId)) {
+      const current = extraCounts[extraId] || 0;
+      if (current >= extra.max_allowed) {
+        setLimitErrors([
+          {
+            date: extra.event_date,
+            time: extra.time.slice(0, 5),
+            title: extra.title,
+            isExtra: true,
+          },
+        ]);
+        return;
+      }
+    }
+
     const next = new Set(extrasDraft);
     if (next.has(extraId)) next.delete(extraId);
     else next.add(extraId);
@@ -807,26 +713,99 @@ setBlockedDates(blockedDatesSet);
     if (recWeekday === "" || recHorarioId === "") return;
 
     const horarioId = recHorarioId as number;
-    const next = new Set(monthlyDraft);
+    const horario = horarios.find((h) => h.id === horarioId);
+    if (!horario) return;
+
     const daysInMonth = lastDayOfMonth.getDate();
+
+    // Modo "clear": remove todas as marcações para o dia da semana, sem checar limites.
+    if (mode === "clear") {
+      const next = new Set(monthlyDraft);
+      for (let d = 1; d <= daysInMonth; d++) {
+        const dt = new Date(year, month, d);
+        if (dt.getDay() === recWeekday) {
+          const date = formatDate(dt);
+          next.delete(`${date}|${horarioId}`);
+        }
+      }
+      setMonthlyDraft(next);
+      setInfo("Recorrência removida.");
+      setError(null);
+      return;
+    }
+
+    // Modo "set": classifica cada data candidata em disponível / lotada / bloqueada.
+    const availableKeys: string[] = [];
+    const fullSlots: LimitConflict[] = [];
 
     for (let d = 1; d <= daysInMonth; d++) {
       const dt = new Date(year, month, d);
-      if (dt.getDay() === recWeekday) {
-        const date = formatDate(dt);
-        const key = `${date}|${horarioId}`;
-        if (mode === "set") next.add(key);
-        else next.delete(key);
+      if (dt.getDay() !== recWeekday) continue;
+
+      const date = formatDate(dt);
+      const key = `${date}|${horarioId}`;
+
+      // Pula datas com este horário bloqueado pela coordenação
+      const blocked = blockedMasses.find((b) => b.date === date);
+      if (blocked && blocked.blocked_times && blocked.blocked_times.includes(horario.time)) {
+        continue;
       }
+
+      // Já no draft ou já no banco para este usuário -> não consome nova vaga
+      if (monthlyDraft.has(key) || originalMonthly.has(key)) {
+        availableKeys.push(key);
+        continue;
+      }
+
+      const current = slotCounts[key] || 0;
+      if (current >= horario.max_allowed) {
+        fullSlots.push({
+          date,
+          time: horario.time.slice(0, 5),
+          isExtra: false,
+        });
+        continue;
+      }
+
+      availableKeys.push(key);
     }
 
+    // Sem conflitos: aplica direto.
+    if (fullSlots.length === 0) {
+      const next = new Set(monthlyDraft);
+      availableKeys.forEach((k) => next.add(k));
+      setMonthlyDraft(next);
+      setInfo("Recorrência aplicada para o mês.");
+      setError(null);
+      return;
+    }
+
+    // Com conflitos: o usuário decide no modal.
+    fullSlots.sort((a, b) => a.date.localeCompare(b.date));
+    setRecurrenceConflict({ availableKeys, fullSlots });
+  };
+
+  const handleRecurrencePartial = () => {
+    if (!recurrenceConflict) return;
+    const next = new Set(monthlyDraft);
+    recurrenceConflict.availableKeys.forEach((k) => next.add(k));
     setMonthlyDraft(next);
-    setInfo(
-      mode === "set"
-        ? "Recorrência aplicada para o mês."
-        : "Recorrência removida."
-    );
+
+    const applied = recurrenceConflict.availableKeys.length;
+    const skipped = recurrenceConflict.fullSlots.length;
+    if (applied > 0) {
+      setInfo(
+        `Recorrência aplicada parcialmente: ${applied} marcado(s), ${skipped} ignorado(s) por estarem lotados.`
+      );
+    } else {
+      setInfo(`Nenhum horário marcado: todos os ${skipped} estavam lotados.`);
+    }
     setError(null);
+    setRecurrenceConflict(null);
+  };
+
+  const handleRecurrenceCancel = () => {
+    setRecurrenceConflict(null);
   };
   // ========= DIFERENÇAS =========
 
@@ -1003,15 +982,6 @@ setBlockedDates(blockedDatesSet);
       setSlotCounts(tempSlotCounts);
       setExtraCounts(tempExtraCounts);
       setInfo("Disponibilidade salva com sucesso.");
-      // Tudo confirmado no banco -> rascunho local não é mais necessário.
-      try {
-        if (typeof window !== "undefined" && selectedMinisterId) {
-          window.localStorage.removeItem(getDraftKey(selectedMinisterId, year, month));
-        }
-      } catch {
-        /* noop */
-      }
-      setDraftRestoredInfo(null);
       setSavingAll(false);
       return true;
     } catch (e: any) {
@@ -1058,15 +1028,6 @@ setBlockedDates(blockedDatesSet);
     const { to, replace } = pendingNav;
     setMonthlyDraft(new Set(originalMonthly));
     setExtrasDraft(new Set(originalExtras));
-    // Usuário escolheu descartar -> apaga rascunho local também
-    try {
-      if (typeof window !== "undefined" && selectedMinisterId) {
-        window.localStorage.removeItem(getDraftKey(selectedMinisterId, year, month));
-      }
-    } catch {
-      /* noop */
-    }
-    setDraftRestoredInfo(null);
     setShowNavConfirm(false);
     setPendingNav(null);
     if (replace) navigate(to, { replace: true });
@@ -1090,93 +1051,6 @@ setBlockedDates(blockedDatesSet);
       </div>
     );
   }
-{/* ================= RECORRÊNCIA ================= */}
-{canEditSelectedMonth && (
-  <div className="bg-white border border-gray-200 rounded-2xl p-3 text-[9px] space-y-2">
-
-    <div className="flex flex-col sm:flex-row sm:items-end gap-2">
-
-      {/* Dia da semana */}
-      <div className="flex-1">
-        <label className="block text-[9px] text-gray-600 mb-1">
-          Recorrência - Dia da semana
-        </label>
-        <select
-          className="w-full border rounded px-2 py-1"
-          value={recWeekday === "" ? "" : recWeekday}
-          onChange={(e) =>
-            setRecWeekday(
-              e.target.value === "" ? "" : Number(e.target.value)
-            )
-          }
-        >
-          <option value="">Selecione</option>
-          {WEEKDAYS_FULL.map((w, idx) => (
-            <option key={idx} value={idx}>
-              {w}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* Horário */}
-      <div className="flex-1">
-        <label className="block text-[9px] text-gray-600 mb-1">
-          Horário fixo
-        </label>
-        <select
-          className="w-full border rounded px-2 py-1"
-          value={recHorarioId === "" ? "" : recHorarioId}
-          onChange={(e) =>
-            setRecHorarioId(
-              e.target.value === "" ? "" : Number(e.target.value)
-            )
-          }
-          disabled={
-            recWeekday === "" || horariosForRecWeekday.length === 0
-          }
-        >
-          <option value="">Selecione</option>
-          {horariosForRecWeekday.map((h) => (
-            <option key={h.id} value={h.id}>
-              {WEEKDAYS_FULL[h.weekday]} — {h.time.slice(0, 5)}h
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* Botões */}
-      <div className="flex flex-col sm:flex-row gap-1 sm:ml-2">
-        <button
-          onClick={() => applyRecurrence("set")}
-          disabled={
-            recWeekday === "" || recHorarioId === "" || savingAll
-          }
-          className="px-3 py-1.5 rounded-full bg-[#7C3AED] text-white text-[9px] hover:bg-[#6D28D9] disabled:opacity-50"
-        >
-          Aplicar no mês
-        </button>
-
-        <button
-          onClick={() => applyRecurrence("clear")}
-          disabled={
-            recWeekday === "" || recHorarioId === "" || savingAll
-          }
-          className="px-3 py-1.5 rounded-full border border-gray-300 text-[9px] text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-        >
-          Limpar recorrência
-        </button>
-      </div>
-    </div>
-
-    <p className="text-[8px] text-gray-500">
-      Exemplo: "Todas as segundas às 11h30" — escolha o dia,
-      selecione o horário e clique em "Aplicar no mês".
-    </p>
-  </div>
-)}
-  const currentMinister =
-    ministers.find((m) => m.id === selectedMinisterId) || me;
 
   let dayHorarios: Horario[] = [];
   let dayExtras: Extra[] = [];
@@ -1246,22 +1120,6 @@ setBlockedDates(blockedDatesSet);
       {/* Erros / infos */}
       {error && <div className="text-sm text-red-600 bg-red-50 border-2 border-red-200 px-4 py-3 rounded-2xl flex items-center gap-2"><span>⚠️</span>{error}</div>}
       {info && <div className="text-sm text-green-700 bg-green-50 border-2 border-green-200 px-4 py-3 rounded-2xl flex items-center gap-2"><span>✅</span>{info}</div>}
-      {draftRestoredInfo && (
-        <div className="text-sm text-blue-700 bg-blue-50 border-2 border-blue-200 px-4 py-3 rounded-2xl flex items-start gap-2">
-          <span className="flex-shrink-0">💾</span>
-          <div className="flex-1 min-w-0">
-            <p className="font-semibold">Marcações recuperadas</p>
-            <p className="text-xs text-blue-600 mt-0.5">{draftRestoredInfo} Confirme para salvar.</p>
-          </div>
-          <button
-            onClick={() => setDraftRestoredInfo(null)}
-            className="text-blue-400 hover:text-blue-600 text-lg leading-none flex-shrink-0"
-            aria-label="Fechar aviso"
-          >
-            ×
-          </button>
-        </div>
-      )}
 
       {/* Recorrência */}
       {canEditSelectedMonth && (
@@ -1620,6 +1478,87 @@ setBlockedDates(blockedDatesSet);
               >
                 Entendi
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de conflito ao aplicar recorrência */}
+      {recurrenceConflict && recurrenceConflict.fullSlots.length > 0 && (
+        <div className="fixed inset-0 bg-black/40 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+          <div className="bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[85vh]">
+            <div className="flex justify-center pt-3 pb-1 sm:hidden flex-shrink-0">
+              <div className="w-10 h-1 bg-gray-200 rounded-full" />
+            </div>
+
+            <div className="px-5 pt-4 pb-3 flex-shrink-0">
+              <div className="flex justify-center mb-3">
+                <div className="w-14 h-14 rounded-full bg-amber-50 border-2 border-amber-100 flex items-center justify-center">
+                  <span className="text-2xl">⚠️</span>
+                </div>
+              </div>
+
+              <h3 className="text-base font-bold text-[#1E3A6E] text-center mb-2">
+                {recurrenceConflict.fullSlots.length === 1
+                  ? "1 horário sem vagas na recorrência"
+                  : `${recurrenceConflict.fullSlots.length} horários sem vagas na recorrência`}
+              </h3>
+
+              <p className="text-sm text-gray-600 text-center">
+                Os horários abaixo já atingiram o número máximo de ministros e não podem ser marcados.
+              </p>
+            </div>
+
+            <div className="px-5 overflow-y-auto flex-1 min-h-0">
+              <div className="space-y-2 pb-1">
+                {recurrenceConflict.fullSlots.map((c, idx) => (
+                  <div
+                    key={`rec-${c.date}-${c.time}-${idx}`}
+                    className="bg-red-50 border-2 border-red-100 rounded-2xl p-3"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-base flex-shrink-0">📅</span>
+                        <span className="text-sm font-bold text-gray-800 truncate">
+                          {formatDateBR(c.date)}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <span className="text-base">🕒</span>
+                        <span className="text-sm font-bold text-gray-800">
+                          {c.time}h
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="px-5 pt-3 pb-5 flex-shrink-0">
+              <p className="text-xs text-gray-500 text-center mb-3">
+                {recurrenceConflict.availableKeys.length > 0
+                  ? `Há ${recurrenceConflict.availableKeys.length} horário(s) disponível(is). O que deseja fazer?`
+                  : "Não há horários disponíveis para marcar."}
+              </p>
+              <div className="flex flex-col gap-2">
+                <button
+                  onClick={handleRecurrencePartial}
+                  disabled={recurrenceConflict.availableKeys.length === 0}
+                  className="w-full py-3 rounded-2xl bg-gradient-to-r from-[#2756A3] to-[#4A6FA5] text-white text-sm font-bold shadow-md shadow-blue-100 active:scale-95 transition-transform disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Marcar apenas os disponíveis
+                  {recurrenceConflict.availableKeys.length > 0 && (
+                    <span className="ml-1 opacity-80">({recurrenceConflict.availableKeys.length})</span>
+                  )}
+                </button>
+                <button
+                  onClick={handleRecurrenceCancel}
+                  className="w-full py-3 rounded-2xl border-2 border-gray-200 text-gray-700 text-sm font-semibold hover:bg-gray-50"
+                >
+                  Cancelar recorrência
+                </button>
+              </div>
             </div>
           </div>
         </div>
