@@ -19,6 +19,7 @@ type AvailabilitySettings = {
   id: number;
   days_before_next_month: number | null;
   hard_close: boolean | null;
+  months_ahead: number | null;
   created_at: string;
 };
 
@@ -38,6 +39,7 @@ export default function DisponibilidadeJanelaConfig() {
   // config padrão
   const [daysBefore, setDaysBefore] = useState(10);
   const [hardClose, setHardClose] = useState(false);
+  const [monthsAhead, setMonthsAhead] = useState(1);
 
   // overrides
   const [overrides, setOverrides] = useState<AvailabilityOverride[]>([]);
@@ -94,6 +96,7 @@ export default function DisponibilidadeJanelaConfig() {
         const c = cfg as AvailabilitySettings;
         setDaysBefore(c.days_before_next_month ?? 10);
         setHardClose(!!c.hard_close);
+        setMonthsAhead(c.months_ahead ?? 1);
       }
 
       // overrides ativos (com open_until >= hoje)
@@ -125,6 +128,7 @@ export default function DisponibilidadeJanelaConfig() {
     const { error } = await supabase.from("availability_settings").insert({
       days_before_next_month: daysBefore,
       hard_close: hardClose,
+      months_ahead: monthsAhead,
     });
 
     setSaving(false);
@@ -276,6 +280,25 @@ export default function DisponibilidadeJanelaConfig() {
                     setDaysBefore(Math.max(1, Number(e.target.value) || 1))
                   }
                 />
+              </div>
+
+              <div className="flex-1">
+                <label className="block text-sm text-gray-700 mb-1 font-medium">
+                  Meses à frente liberados para preenchimento
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={12}
+                  className="w-full border rounded px-2 py-1 text-sm"
+                  value={monthsAhead}
+                  onChange={(e) =>
+                    setMonthsAhead(Math.min(12, Math.max(1, Number(e.target.value) || 1)))
+                  }
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  Ex: 1 = só próximo mês · 3 = próximo + 2 seguintes
+                </p>
               </div>
 
               <div className="flex items-center gap-2 mt-2">

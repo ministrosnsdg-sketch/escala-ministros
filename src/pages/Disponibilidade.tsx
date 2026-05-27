@@ -142,12 +142,14 @@ function DisponibilidadeInner() {
   const [blockedDates, setBlockedDates] = useState<Set<string>>(new Set());
 
   const [settingsDaysBefore, setSettingsDaysBefore] = useState<number>(10);
+  const [settingsMonthsAhead, setSettingsMonthsAhead] = useState<number>(1);
   const [overrides, setOverrides] = useState<AvailabilityOverride[]>([]);
   const [settingsHardClose, setSettingsHardClose] = useState<boolean>(false);
 
   const [loadingBase, setLoadingBase] = useState(true);
   const [loadingMonth, setLoadingMonth] = useState(false);
   const [savingAll, setSavingAll] = useState(false);
+  const [copyingPrev, setCopyingPrev] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
 
@@ -206,6 +208,7 @@ function DisponibilidadeInner() {
 
   // Regra janela
   const { canEditSelectedMonth, windowMessage } = useMemo(() => {
+    // Override manual tem prioridade máxima
     const manual = overrides.find(
       (ov) =>
         ov.year === year &&
@@ -229,31 +232,42 @@ function DisponibilidadeInner() {
       };
     }
 
-    if (year !== realNextYear || month !== realNextMonth) {
-      return {
-        canEditSelectedMonth: false,
-        windowMessage:
-          "Edição liberada apenas para o próximo mês definido pela coordenação.",
-      };
+    // Calcula o intervalo permitido: do próximo mês até próximo mês + (monthsAhead - 1)
+    const ahead = Math.max(1, settingsMonthsAhead);
+    const firstTotal = realNextYear * 12 + realNextMonth;
+    const lastTotal = firstTotal + ahead - 1;
+    const lastYear = Math.floor(lastTotal / 12);
+    const lastMonth = lastTotal % 12; // 0-based
+
+    const selectedTotal = year * 12 + month;
+
+    if (selectedTotal < firstTotal || selectedTotal > lastTotal) {
+      const firstLabel = `${MONTH_NAMES[realNextMonth]}/${realNextYear}`;
+      const lastLabel = `${MONTH_NAMES[lastMonth]}/${lastYear}`;
+      const rangeMsg =
+        ahead === 1
+          ? `Edição liberada apenas para ${firstLabel}.`
+          : `Edição liberada de ${firstLabel} até ${lastLabel}.`;
+      return { canEditSelectedMonth: false, windowMessage: rangeMsg };
     }
 
+    // A janela abre X dias antes do 1º do próximo mês e fecha no último dia do último mês permitido
     const openFrom = new Date(realNextYear, realNextMonth, 1);
     openFrom.setDate(openFrom.getDate() - (settingsDaysBefore || 10));
-    const closeAt = new Date(realNextYear, realNextMonth + 1, 0);
+    const closeAt = new Date(lastYear, lastMonth + 1, 0);
+    closeAt.setHours(23, 59, 59, 999);
 
     if (now < openFrom) {
       return {
         canEditSelectedMonth: false,
-        windowMessage: `A disponibilidade deste mês abrirá em ${openFrom.toLocaleDateString(
-          "pt-BR"
-        )}.`,
+        windowMessage: `A disponibilidade abrirá em ${openFrom.toLocaleDateString("pt-BR")}.`,
       };
     }
 
     if (now > closeAt) {
       return {
         canEditSelectedMonth: false,
-        windowMessage: "A janela de edição para este mês já foi encerrada.",
+        windowMessage: "A janela de edição para este período já foi encerrada.",
       };
     }
 
@@ -265,6 +279,7 @@ function DisponibilidadeInner() {
   }, [
     settingsHardClose,
     settingsDaysBefore,
+    settingsMonthsAhead,
     year,
     month,
     realNextMonth,
@@ -475,6 +490,7 @@ function DisponibilidadeInner() {
       if (sData) {
         setSettingsDaysBefore(sData.days_before_next_month ?? 10);
         setSettingsHardClose(!!sData.hard_close);
+        setSettingsMonthsAhead(sData.months_ahead ?? 1);
       }
 
       // Liberações manuais ativas (open_until >= agora) configuradas pela coordenação
@@ -823,6 +839,97 @@ setBlockedDates(blockedDatesSet);
   const handleRecurrenceCancel = () => {
     setRecurrenceConflict(null);
   };
+
+  // ========= COPIAR MÊS ANTERIOR =========
+
+  const copyPreviousMonth = async () => {
+    if (!canEditSelectedMonth || !selectedMinisterId || savingAll || copyingPrev) return;
+
+    const prevMonth = month === 0 ? 11 : month - 1;
+    const prevYear = month === 0 ? year - 1 : year;
+    const prevStart = formatDate(new Date(prevYear, prevMonth, 1));
+    const prevEnd = formatDate(new Date(prevYear, prevMonth + 1, 0));
+
+    setCopyingPrev(true);
+    setError(null);
+    setInfo(null);
+
+    const { data: prevData, error: prevErr } = await supabase
+      .from("monthly_availability_regular")
+      .select("horario_id")
+      .eq("minister_id", selectedMinisterId)
+      .gte("date", prevStart)
+      .lte("date", prevEnd);
+
+    setCopyingPrev(false);
+
+    if (prevErr) {
+      setError("Erro ao carregar disponibilidade do mês anterior.");
+      return;
+    }
+
+    if (!prevData || prevData.length === 0) {
+      setInfo("Nenhuma disponibilidade registrada no mês anterior para copiar.");
+      return;
+    }
+
+    // horario_ids únicos marcados no mês anterior
+    const markedHorarioIds = new Set<number>(prevData.map((r: any) => r.horario_id as number));
+
+    const daysInMonth = lastDayOfMonth.getDate();
+    const availableSet = new Set<string>();
+    const fullSlots: LimitConflict[] = [];
+
+    markedHorarioIds.forEach((horarioId) => {
+      const horario = horarios.find((h) => h.id === horarioId);
+      if (!horario) return;
+
+      for (let d = 1; d <= daysInMonth; d++) {
+        const dt = new Date(year, month, d);
+        if (dt.getDay() !== horario.weekday) continue;
+
+        const date = formatDate(dt);
+        const key = `${date}|${horarioId}`;
+
+        // Bloqueado pela coordenação → pula silenciosamente
+        if (isSlotBlocked(date, horario.time)) continue;
+
+        // Já marcado no draft ou no banco → inclui sem consumir vaga nova
+        if (monthlyDraft.has(key) || originalMonthly.has(key)) {
+          availableSet.add(key);
+          continue;
+        }
+
+        const current = slotCounts[key] || 0;
+        if (current >= horario.max_allowed) {
+          fullSlots.push({ date, time: horario.time.slice(0, 5), isExtra: false });
+          continue;
+        }
+
+        availableSet.add(key);
+      }
+    });
+
+    const availableKeys = Array.from(availableSet);
+
+    if (availableKeys.length === 0 && fullSlots.length === 0) {
+      setInfo("Nenhum horário do mês anterior se aplica a este mês.");
+      return;
+    }
+
+    if (fullSlots.length === 0) {
+      const next = new Set(monthlyDraft);
+      availableKeys.forEach((k) => next.add(k));
+      setMonthlyDraft(next);
+      setInfo(`${availableKeys.length} horário(s) copiado(s) do mês anterior.`);
+      return;
+    }
+
+    // Tem conflitos de vagas → abre o modal de conflito existente
+    fullSlots.sort((a, b) => a.date.localeCompare(b.date));
+    setRecurrenceConflict({ availableKeys, fullSlots });
+  };
+
   // ========= DIFERENÇAS =========
 
   const buildChanges = () => {
@@ -1178,6 +1285,18 @@ setBlockedDates(blockedDatesSet);
             </button>
           </div>
           <p className="text-xs text-gray-400 mt-2">Ex: "Todos os domingos às 08:30h" → selecione e toque em Aplicar.</p>
+
+          <div className="border-t border-[#FCD9A5] mt-3 pt-3">
+            <button
+              onClick={copyPreviousMonth}
+              disabled={copyingPrev || savingAll}
+              className="w-full py-2.5 rounded-xl bg-[#059669] text-white text-sm font-bold disabled:opacity-50 active:scale-95 transition-transform"
+            >
+              {copyingPrev
+                ? "Copiando..."
+                : `Repetir escala de ${MONTH_NAMES[month === 0 ? 11 : month - 1]}`}
+            </button>
+          </div>
         </div>
       )}
 
@@ -1591,14 +1710,16 @@ setBlockedDates(blockedDatesSet);
               <p className="text-xs text-gray-400">Nenhuma alteração pendente</p>
             )}
           </div>
-          <button onClick={openConfirm} disabled={!hasPendingChanges || savingAll}
-            className={`px-5 py-2.5 rounded-xl text-sm font-bold text-white transition-all flex-shrink-0 ${
-              hasPendingChanges
-                ? "bg-gradient-to-r from-[#2756A3] to-[#4A6FA5] shadow-md shadow-blue-100 active:scale-95"
-                : "bg-gray-200 text-gray-400 cursor-not-allowed"
-            }`}>
-            {savingAll ? "Salvando..." : "Confirmar"}
-          </button>
+          <div className="flex gap-2 flex-shrink-0">
+            <button onClick={openConfirm} disabled={!hasPendingChanges || savingAll}
+              className={`px-5 py-2.5 rounded-xl text-sm font-bold text-white transition-all ${
+                hasPendingChanges
+                  ? "bg-gradient-to-r from-[#2756A3] to-[#4A6FA5] shadow-md shadow-blue-100 active:scale-95"
+                  : "bg-gray-200 text-gray-400 cursor-not-allowed"
+              }`}>
+              {savingAll ? "Salvando..." : "Confirmar"}
+            </button>
+          </div>
         </div>
       </div>
 
