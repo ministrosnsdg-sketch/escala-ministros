@@ -84,6 +84,7 @@ export default function ResumoPorMinistro() {
     const { data: mData, error: mErr } = await supabase
       .from("ministers")
       .select("id, name")
+      .eq("active", true)
       .order("name");
 
     if (mErr) {

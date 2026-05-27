@@ -149,7 +149,6 @@ function DisponibilidadeInner() {
   const [loadingBase, setLoadingBase] = useState(true);
   const [loadingMonth, setLoadingMonth] = useState(false);
   const [savingAll, setSavingAll] = useState(false);
-  const [copyingPrev, setCopyingPrev] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
 
@@ -840,96 +839,6 @@ setBlockedDates(blockedDatesSet);
     setRecurrenceConflict(null);
   };
 
-  // ========= COPIAR MÊS ANTERIOR =========
-
-  const copyPreviousMonth = async () => {
-    if (!canEditSelectedMonth || !selectedMinisterId || savingAll || copyingPrev) return;
-
-    const prevMonth = month === 0 ? 11 : month - 1;
-    const prevYear = month === 0 ? year - 1 : year;
-    const prevStart = formatDate(new Date(prevYear, prevMonth, 1));
-    const prevEnd = formatDate(new Date(prevYear, prevMonth + 1, 0));
-
-    setCopyingPrev(true);
-    setError(null);
-    setInfo(null);
-
-    const { data: prevData, error: prevErr } = await supabase
-      .from("monthly_availability_regular")
-      .select("horario_id")
-      .eq("minister_id", selectedMinisterId)
-      .gte("date", prevStart)
-      .lte("date", prevEnd);
-
-    setCopyingPrev(false);
-
-    if (prevErr) {
-      setError("Erro ao carregar disponibilidade do mês anterior.");
-      return;
-    }
-
-    if (!prevData || prevData.length === 0) {
-      setInfo("Nenhuma disponibilidade registrada no mês anterior para copiar.");
-      return;
-    }
-
-    // horario_ids únicos marcados no mês anterior
-    const markedHorarioIds = new Set<number>(prevData.map((r: any) => r.horario_id as number));
-
-    const daysInMonth = lastDayOfMonth.getDate();
-    const availableSet = new Set<string>();
-    const fullSlots: LimitConflict[] = [];
-
-    markedHorarioIds.forEach((horarioId) => {
-      const horario = horarios.find((h) => h.id === horarioId);
-      if (!horario) return;
-
-      for (let d = 1; d <= daysInMonth; d++) {
-        const dt = new Date(year, month, d);
-        if (dt.getDay() !== horario.weekday) continue;
-
-        const date = formatDate(dt);
-        const key = `${date}|${horarioId}`;
-
-        // Bloqueado pela coordenação → pula silenciosamente
-        if (isSlotBlocked(date, horario.time)) continue;
-
-        // Já marcado no draft ou no banco → inclui sem consumir vaga nova
-        if (monthlyDraft.has(key) || originalMonthly.has(key)) {
-          availableSet.add(key);
-          continue;
-        }
-
-        const current = slotCounts[key] || 0;
-        if (current >= horario.max_allowed) {
-          fullSlots.push({ date, time: horario.time.slice(0, 5), isExtra: false });
-          continue;
-        }
-
-        availableSet.add(key);
-      }
-    });
-
-    const availableKeys = Array.from(availableSet);
-
-    if (availableKeys.length === 0 && fullSlots.length === 0) {
-      setInfo("Nenhum horário do mês anterior se aplica a este mês.");
-      return;
-    }
-
-    if (fullSlots.length === 0) {
-      const next = new Set(monthlyDraft);
-      availableKeys.forEach((k) => next.add(k));
-      setMonthlyDraft(next);
-      setInfo(`${availableKeys.length} horário(s) copiado(s) do mês anterior.`);
-      return;
-    }
-
-    // Tem conflitos de vagas → abre o modal de conflito existente
-    fullSlots.sort((a, b) => a.date.localeCompare(b.date));
-    setRecurrenceConflict({ availableKeys, fullSlots });
-  };
-
   // ========= DIFERENÇAS =========
 
   const buildChanges = () => {
@@ -1286,17 +1195,6 @@ setBlockedDates(blockedDatesSet);
           </div>
           <p className="text-xs text-gray-400 mt-2">Ex: "Todos os domingos às 08:30h" → selecione e toque em Aplicar.</p>
 
-          <div className="border-t border-[#FCD9A5] mt-3 pt-3">
-            <button
-              onClick={copyPreviousMonth}
-              disabled={copyingPrev || savingAll}
-              className="w-full py-2.5 rounded-xl bg-[#059669] text-white text-sm font-bold disabled:opacity-50 active:scale-95 transition-transform"
-            >
-              {copyingPrev
-                ? "Copiando..."
-                : `Repetir escala de ${MONTH_NAMES[month === 0 ? 11 : month - 1]}`}
-            </button>
-          </div>
         </div>
       )}
 
