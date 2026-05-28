@@ -14,7 +14,6 @@ interface MenuItem {
 const COMMON_MENU: MenuItem[] = [
   { path: "/escala", label: "Escala", icon: "📅" },
   { path: "/disponibilidade", label: "Disponibilidade", icon: "✅" },
-  { path: "/troca", label: "Troca", icon: "🔄" },
 ];
 
 const ADMIN_EXTRA_MENU: MenuItem[] = [
@@ -369,7 +368,7 @@ export function Layout({ children }: { children: ReactNode }) {
         </div>
       )}
 
-      {pendingSwaps > 0 && location.pathname !== "/troca" && (
+      {false && pendingSwaps > 0 && location.pathname !== "/troca" && (
         <div className="max-w-7xl mx-auto px-3 pt-2 no-print">
           <div
             className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-center gap-3 cursor-pointer hover:bg-blue-100 transition-colors"
@@ -480,7 +479,6 @@ export function Layout({ children }: { children: ReactNode }) {
             {[
               { path: "/escala", icon: "📅", label: "Escala" },
               { path: "/disponibilidade", icon: "✅", label: "Disponib." },
-              { path: "/troca", icon: "🔄", label: "Troca" },
               { path: "/perfil", label: "Perfil", icon: "" },
               { path: "__logout__", icon: "🚪", label: "Sair" },
             ].map((item) =>
