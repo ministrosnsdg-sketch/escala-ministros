@@ -120,7 +120,8 @@ export function Layout({ children }: { children: ReactNode }) {
       const { data: bdays } = await supabase
         .from("ministers")
         .select("name, birth_date")
-        .not("birth_date", "is", null);
+        .not("birth_date", "is", null)
+        .eq("active", true);
 
       if (!cancelled && bdays) {
         const list = bdays
